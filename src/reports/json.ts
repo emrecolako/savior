@@ -21,7 +21,7 @@ export function writeJsonReport(result: AnalysisResult, config: ReportConfig): v
     variants: result.variants,
     pathways: result.pathways.map((p) => ({
       ...p,
-      variants: p.variants.map((v) => v.rsid), // de-duplicate — just rsids
+      variants: p.variants, // full variant objects for dashboard consumption
     })),
     actionItems: result.actionItems,
   };
