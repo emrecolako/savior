@@ -1,6 +1,12 @@
 import type { AnalysisResult, MatchedVariant, ReportConfig } from "../types.js";
 import { writeFileSync } from "node:fs";
 
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 const SEVERITY_EMOJI: Record<string, string> = {
   critical: "🔴",
   high: "🟠",
@@ -53,6 +59,45 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
   // ── APOE ──
   lines.push(`## APOE Genotype\n`);
   lines.push(`**${result.apoe.diplotype}** — ${result.apoe.explanation}\n`);
+
+  // ── Polygenic Risk Scores ──
+  if (config.includePrs && result.prs && result.prs.traits.length > 0) {
+    lines.push(`## Polygenic Risk Scores\n`);
+    lines.push(`Polygenic risk scores aggregate the effects of hundreds to thousands of genetic variants to estimate overall genetic predisposition for complex traits. Scores are normalised against a reference population to produce percentile rankings.\n`);
+
+    // Summary table
+    lines.push(`| Trait | Percentile | Risk | Coverage | PGS ID |`);
+    lines.push(`|-------|-----------|------|----------|--------|`);
+    for (const t of result.prs.traits) {
+      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+      lines.push(`| ${t.traitName} | **${pctStr}** | ${t.riskCategory.toUpperCase()} | ${Math.round(t.coveragePct)}% | ${t.pgsId} |`);
+    }
+    lines.push("");
+
+    // Per-trait detail
+    for (const t of result.prs.traits) {
+      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+      const riskIcon = t.percentile >= 95 ? "🔴" : t.percentile >= 80 ? "🟠" : t.percentile >= 60 ? "🟡" : "🟢";
+      lines.push(`### ${riskIcon} ${t.traitName} — ${pctStr} Percentile (${t.riskCategory.toUpperCase()})\n`);
+      lines.push(`${t.interpretation}\n`);
+      lines.push(`- **Variants scored:** ${t.variantsUsed.toLocaleString()} of ${t.variantsTotal.toLocaleString()} (${Math.round(t.coveragePct)}% coverage)`);
+      lines.push(`- **Raw score:** ${t.rawScore.toFixed(4)} | **Z-score:** ${t.zScore.toFixed(2)}\n`);
+
+      if (t.topContributors.length > 0) {
+        lines.push(`**Top contributing variants:**\n`);
+        lines.push(`| rsID | Gene | Effect Allele | Dosage | Contribution |`);
+        lines.push(`|------|------|---------------|--------|--------------|`);
+        for (const c of t.topContributors) {
+          lines.push(`| ${c.rsid} | ${c.gene ?? "—"} | ${c.effectAllele} | ${c.dosage} | ${c.contribution > 0 ? "+" : ""}${c.contribution.toFixed(4)} |`);
+        }
+        lines.push("");
+      }
+    }
+
+    if (result.prs.limitations.length > 0) {
+      lines.push(`> **PRS Limitations:** ${result.prs.limitations.join(" ")}\n`);
+    }
+  }
 
   // ── Plain-English Summary ──
   if (config.includeSummary) {
