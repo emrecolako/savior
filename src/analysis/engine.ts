@@ -9,7 +9,9 @@ import type {
   ActionItem,
   PathwayConvergence,
   GenomicReportConfig,
+  PrsResult,
 } from "../types.js";
+import { computeAllPrs } from "./prs-engine.js";
 
 // ─── Zygosity determination ─────────────────────────────────────
 
@@ -242,13 +244,18 @@ export function detectPathways(variants: MatchedVariant[]): PathwayConvergence[]
 export function generateActionItems(
   variants: MatchedVariant[],
   pathways: PathwayConvergence[],
-  apoe: ApoeGenotype
+  apoe: ApoeGenotype,
+  prs?: PrsResult
 ): ActionItem[] {
   const items: ActionItem[] = [];
+
+  // Track which slugs already have pathway-based actions to avoid duplicates with PRS
+  const pathwayActionSlugs = new Set<string>();
 
   // Screening based on pathways
   for (const p of pathways) {
     if (p.riskLevel === "high" || p.riskLevel === "elevated") {
+      pathwayActionSlugs.add(p.slug);
       if (p.slug === "cad") {
         items.push({
           priority: "urgent",
@@ -288,6 +295,44 @@ export function generateActionItems(
     }
   }
 
+  // PRS-based action items (only if pathway didn't already cover it)
+  if (prs) {
+    for (const trait of prs.traits) {
+      if (trait.percentile < 80) continue;
+      // Map PRS trait IDs to pathway slugs for dedup
+      if (pathwayActionSlugs.has(trait.traitId)) continue;
+
+      const ordinal = `${Math.round(trait.percentile)}${ordinalSuffix(Math.round(trait.percentile))}`;
+      if (trait.traitId === "cad") {
+        items.push({
+          priority: "urgent",
+          category: "screening",
+          title: "Coronary artery calcium (CAC) score — elevated PRS",
+          detail: `Polygenic risk score for CAD is in the ${ordinal} percentile (${trait.riskCategory}). Comprehensive lipid panel with Lp(a) and apoB recommended.`,
+          relatedVariants: trait.topContributors.map((c) => c.rsid),
+        });
+      }
+      if (trait.traitId === "t2d") {
+        items.push({
+          priority: "recommended",
+          category: "screening",
+          title: "Fasting glucose and HbA1c — elevated PRS",
+          detail: `Polygenic risk score for T2D is in the ${ordinal} percentile (${trait.riskCategory}). Regular metabolic monitoring recommended.`,
+          relatedVariants: trait.topContributors.map((c) => c.rsid),
+        });
+      }
+      if (trait.traitId === "autoimmune") {
+        items.push({
+          priority: "recommended",
+          category: "monitoring",
+          title: "Monitor for autoimmune symptoms — elevated PRS",
+          detail: `Polygenic risk score for autoimmune conditions is in the ${ordinal} percentile (${trait.riskCategory}). Discuss with physician if symptoms arise.`,
+          relatedVariants: trait.topContributors.map((c) => c.rsid),
+        });
+      }
+    }
+  }
+
   // Pharmacogenomics alerts
   const pharmaVariants = variants.filter(
     (v) => v.category === "pharmacogenomics" && v.riskAlleleCount !== 0
@@ -316,6 +361,12 @@ export function generateActionItems(
   return items;
 }
 
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 // ─── Main analysis entry point ──────────────────────────────────
 
 export function analyse(
@@ -332,7 +383,18 @@ export function analyse(
   }
 
   const pathways = detectPathways(variants);
-  const actionItems = generateActionItems(variants, pathways, apoe);
+
+  // PRS computation (enabled by default)
+  let prs: PrsResult | undefined;
+  if (config?.prs?.enabled !== false) {
+    try {
+      prs = computeAllPrs(genome, database, config?.prs);
+    } catch {
+      // PRS is optional — don't fail the entire analysis if scoring files are missing
+    }
+  }
+
+  const actionItems = generateActionItems(variants, pathways, apoe, prs);
 
   return {
     inputFile: config?.input?.filePath ?? "unknown",
@@ -345,5 +407,6 @@ export function analyse(
     variants,
     pathways,
     actionItems,
+    prs,
   };
 }
