@@ -6,12 +6,26 @@ import { loadDatabase } from "./database/loader.js";
 import { analyse } from "./analysis/engine.js";
 import { generateReport, writeGpCard, writeGpCardJsonFile } from "./reports/index.js";
 import type { ReportFormat, InputFormat, Severity, Category } from "./types.js";
-
-function ordinalSuffix(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-}
+import {
+  printBanner,
+  printCompactBanner,
+  ProgressTracker,
+  createSnpCounter,
+  apoePanel,
+  pgxAlertPanel,
+  criticalAlertBox,
+  pathwaySummaryPanel,
+  actionItemsPanel,
+  variantSummaryLine,
+  errorPanel,
+  dim,
+  completionBox,
+  prsTable,
+  severityBreakdownTable,
+  categoryBreakdownTable,
+  pgxMatrixTable,
+  printDashboard,
+} from "./ui/index.js";
 
 const program = new Command();
 
@@ -45,19 +59,26 @@ program
   .option("--max-research <n>", "Max research results per variant", "3")
   .action(async (opts) => {
     try {
-      console.log(`\n🧬 genomic-report v0.1.0\n`);
-      console.log(`Parsing: ${opts.input}`);
+      await printBanner();
 
+      const totalSteps = opts.research ? 5 : 4;
+      const progress = new ProgressTracker(totalSteps);
+
+      // Step 1: Parse genome
+      const spin1 = progress.nextStep("Parsing genome file");
       const genome = parseGenome(opts.input, opts.format as InputFormat | undefined);
-      console.log(`  Format:  ${genome.format}`);
-      console.log(`  Build:   ${genome.buildVersion}`);
-      console.log(`  SNPs:    ${genome.totalSnps.toLocaleString()}\n`);
+      progress.complete(spin1, `${genome.totalSnps.toLocaleString()} SNPs loaded (${genome.format}, ${genome.buildVersion})`);
 
-      console.log(`Loading SNP database...`);
+      // Step 2: Load database
+      const spin2 = progress.nextStep("Loading SNP database");
       const db = loadDatabase(opts.database, opts.supplementary);
-      console.log(`  Entries: ${db.entries.length}\n`);
+      progress.complete(spin2, `${db.entries.length.toLocaleString()} entries loaded`);
 
-      console.log(`Analysing...`);
+      // Step 3: Analyse
+      const spin3 = progress.nextStep("Analysing variants");
+      const counter = createSnpCounter(db.entries.length);
+      spin3.stop();
+
       const result = analyse(genome, db, {
         input: { filePath: opts.input },
         prs: {
@@ -70,31 +91,66 @@ program
           categories: opts.categories as Category[] | undefined,
           onlyRiskAlleles: opts.riskOnly,
         },
-      } as any);
+      } as any, (current, total) => {
+        counter.update(current);
+      });
 
-      console.log(`  Matched: ${result.matchedCount} clinically significant variants`);
-      console.log(`  APOE:    ${result.apoe.diplotype}`);
-      console.log(`  Pathways: ${result.pathways.length} convergent pathways detected`);
-      console.log(`  PGx:     ${result.pharmacogenomics.genes.length} enzymes profiled, ${result.pharmacogenomics.interactions.length} drug interactions evaluated`);
-      console.log(`  Actions: ${result.actionItems.length} action items generated`);
+      counter.finish();
+      spin3.start();
+      progress.complete(spin3, `${result.matchedCount} clinically significant variants`);
 
-      if (result.prs && result.prs.traits.length > 0) {
-        console.log(`\nPolygenic Risk Scores:`);
-        for (const t of result.prs.traits) {
-          const coverage = `${t.variantsUsed}/${t.variantsTotal}`;
-          if (t.riskCategory === "insufficient") {
-            console.log(`  ${t.traitName.padEnd(30)}   — insufficient data        [${coverage} variants]`);
-          } else {
-            const pct = Math.round(t.percentile);
-            const cat = t.riskCategory.toUpperCase().padEnd(13);
-            console.log(`  ${t.traitName.padEnd(30)} ${String(pct).padStart(3)}${ordinalSuffix(pct)} percentile (${cat}) [${coverage} variants]`);
-          }
-        }
-      }
+      // Display results
+      console.log("");
+      console.log(`  ${variantSummaryLine(result.variants)}`);
       console.log("");
 
+      // APOE panel
+      console.log(apoePanel(result.apoe));
+      console.log("");
+
+      // Critical findings (cap at 5 to avoid wall of red)
+      const MAX_ALERTS = 5;
+      const criticalVariants = result.variants.filter((v) => v.severity === "critical");
+      const urgentActions = result.actionItems.filter((a) => a.priority === "urgent");
+      const totalAlerts = criticalVariants.length + urgentActions.length;
+
+      for (const v of criticalVariants.slice(0, MAX_ALERTS)) {
+        console.log(criticalAlertBox(
+          `CRITICAL: ${v.gene} — ${v.condition}`,
+          `${v.rsid} ${v.genotype} (${v.zygosity}). ${v.notes}`
+        ));
+        console.log("");
+      }
+
+      const urgentSlots = Math.max(0, MAX_ALERTS - criticalVariants.length);
+      for (const a of urgentActions.slice(0, urgentSlots)) {
+        console.log(criticalAlertBox(`URGENT: ${a.title}`, a.detail));
+        console.log("");
+      }
+
+      if (totalAlerts > MAX_ALERTS) {
+        const remaining = totalAlerts - MAX_ALERTS;
+        console.log(dim(`  … and ${remaining} more critical/urgent finding${remaining > 1 ? "s" : ""} in the full report\n`));
+      }
+
+      // PGx panel
+      console.log(pgxAlertPanel(result.pharmacogenomics.genes));
+      console.log("");
+
+      // Pathway summary
+      if (opts.pathways !== false && result.pathways.length > 0) {
+        console.log(pathwaySummaryPanel(result.pathways));
+        console.log("");
+      }
+
+      // PRS table
+      if (result.prs && result.prs.traits.length > 0) {
+        console.log(prsTable(result.prs.traits));
+      }
+
+      // Research enrichment (optional step)
       if (opts.research) {
-        console.log("Researching variants via PubMed...");
+        const spin4 = progress.nextStep("Enriching with PubMed research");
         const { enrichWithResearch } = await import("./research/index.js");
         await enrichWithResearch(result.variants, {
           provider: opts.researchProvider as any,
@@ -104,10 +160,11 @@ program
           enabled: true,
         });
         const enriched = result.variants.filter(v => v.recentFindings && v.recentFindings.length > 0);
-        console.log(`  Found research for ${enriched.length} variant(s)\n`);
+        progress.complete(spin4, `Found research for ${enriched.length} variant(s)`);
       }
 
-      console.log(`Generating ${opts.reportFormat} report → ${opts.output}`);
+      // Generate report
+      const spinReport = progress.nextStep("Generating report");
       generateReport(result, {
         format: opts.reportFormat as ReportFormat,
         outputPath: opts.output,
@@ -120,10 +177,15 @@ program
         includePrs: opts.prs !== false,
         subjectName: opts.name,
       });
+      progress.complete(spinReport, `${opts.reportFormat} → ${opts.output}`);
 
-      console.log(`✅ Done.\n`);
+      // Final dashboard
+      await printDashboard(result, opts.output, progress.elapsed());
+
     } catch (err: any) {
-      console.error(`\n❌ Error: ${err.message}\n`);
+      console.log("");
+      console.log(errorPanel(err.message));
+      console.log("");
       process.exit(1);
     }
   });
@@ -132,31 +194,26 @@ program
   .command("info")
   .description("Show information about the SNP database")
   .option("-d, --database <path>", "Path to custom SNP database JSON")
-  .action((opts) => {
+  .action(async (opts) => {
+    await printCompactBanner("🧬", "SNP Database Info");
+
+    const progress = new ProgressTracker(1);
+    const spin = progress.nextStep("Loading SNP database");
     const db = loadDatabase(opts.database);
-    console.log(`\n🧬 SNP Database Info\n`);
-    console.log(`  Version:  ${db.version}`);
-    console.log(`  Updated:  ${db.lastUpdated}`);
-    console.log(`  Entries:  ${db.entries.length}\n`);
+    progress.complete(spin, `${db.entries.length.toLocaleString()} entries (v${db.version}, updated ${db.lastUpdated})`);
 
-    // Category breakdown
-    const cats = new Map<string, number>();
-    const sevs = new Map<string, number>();
-    for (const e of db.entries) {
-      cats.set(e.category, (cats.get(e.category) ?? 0) + 1);
-      sevs.set(e.severity, (sevs.get(e.severity) ?? 0) + 1);
-    }
-
-    console.log(`  By category:`);
-    for (const [cat, count] of [...cats.entries()].sort((a, b) => b[1] - a[1])) {
-      console.log(`    ${cat.padEnd(20)} ${count}`);
-    }
-
-    console.log(`\n  By severity:`);
-    for (const [sev, count] of [...sevs.entries()].sort((a, b) => b[1] - a[1])) {
-      console.log(`    ${sev.padEnd(20)} ${count}`);
-    }
     console.log("");
+    console.log(categoryBreakdownTable(db.entries));
+    console.log(severityBreakdownTable(
+      db.entries.map((e) => ({
+        ...e,
+        chromosome: "",
+        position: 0,
+        genotype: "",
+        zygosity: "unknown" as const,
+        riskAlleleCount: 0,
+      }))
+    ));
   });
 
 program
@@ -169,49 +226,52 @@ program
   .option("-n, --name <name>", "Patient name for the card", "Patient")
   .option("-d, --database <path>", "Path to custom SNP database JSON")
   .option("--supplementary <paths...>", "Additional SNP database files to merge")
-  .action((opts) => {
+  .action(async (opts) => {
     try {
-      console.log(`\n💊 Pharmacogenomics GP Card Generator\n`);
-      console.log(`Parsing: ${opts.input}`);
+      await printCompactBanner("💊", "Pharmacogenomics GP Card Generator");
 
+      const progress = new ProgressTracker(3);
+
+      // Step 1: Parse
+      const spin1 = progress.nextStep("Parsing genome file");
       const genome = parseGenome(opts.input, opts.format as InputFormat | undefined);
-      console.log(`  Format: ${genome.format} | SNPs: ${genome.totalSnps.toLocaleString()}\n`);
+      progress.complete(spin1, `${genome.totalSnps.toLocaleString()} SNPs (${genome.format})`);
 
-      console.log(`Loading SNP database...`);
+      // Step 2: Load DB
+      const spin2 = progress.nextStep("Loading SNP database");
       const db = loadDatabase(opts.database, opts.supplementary);
+      progress.complete(spin2, `${db.entries.length.toLocaleString()} entries`);
 
-      console.log(`Analysing pharmacogenomics profile...`);
+      // Step 3: Analyse
+      const spin3 = progress.nextStep("Analysing pharmacogenomics profile");
       const result = analyse(genome, db, {
         input: { filePath: opts.input },
       } as any);
+      progress.complete(spin3, `${result.pharmacogenomics.genes.length} enzymes profiled`);
 
-      const pgx = result.pharmacogenomics;
-      const actionable = pgx.interactions.filter(
-        (di) => di.action !== "use standard dose" && di.action !== "no actionable variant detected" && di.action !== "see notes"
-      );
-
-      console.log(`  Enzymes profiled: ${pgx.genes.length}`);
-      console.log(`  Drug interactions: ${pgx.interactions.length}`);
-      console.log(`  Actionable alerts: ${actionable.length}\n`);
-
-      // Summary
-      for (const g of pgx.genes) {
-        if (g.phenotype !== "normal" && g.phenotype !== "indeterminate") {
-          console.log(`  ⚠️  ${g.gene}: ${g.phenotype} metaboliser (${g.diplotype})`);
-        }
-      }
       console.log("");
 
+      // PGx panel
+      console.log(pgxAlertPanel(result.pharmacogenomics.genes));
+      console.log("");
+
+      // PGx matrix
+      console.log(pgxMatrixTable(result.pharmacogenomics));
+
+      // Write output
       if (opts.reportFormat === "json") {
         writeGpCardJsonFile(result, opts.output, opts.name);
       } else {
         writeGpCard(result, opts.output, opts.name);
       }
 
-      console.log(`Wrote ${opts.reportFormat} GP card → ${opts.output}`);
-      console.log(`✅ Print this card and hand it to your GP or pharmacist.\n`);
+      console.log(completionBox(opts.output, progress.elapsed(), opts.reportFormat));
+      console.log("");
+
     } catch (err: any) {
-      console.error(`\n❌ Error: ${err.message}\n`);
+      console.log("");
+      console.log(errorPanel(err.message));
+      console.log("");
       process.exit(1);
     }
   });

@@ -97,10 +97,17 @@ export function determineApoe(genome: ParsedGenome): ApoeGenotype {
 
 // ─── Core cross-reference ───────────────────────────────────────
 
-export function crossReference(genome: ParsedGenome, database: SnpDatabase): MatchedVariant[] {
+export function crossReference(
+  genome: ParsedGenome,
+  database: SnpDatabase,
+  onProgress?: (current: number, total: number) => void
+): MatchedVariant[] {
   const variants: MatchedVariant[] = [];
+  const total = database.entries.length;
 
-  for (const entry of database.entries) {
+  for (let i = 0; i < total; i++) {
+    const entry = database.entries[i];
+    onProgress?.(i + 1, total);
     const snp = genome.snps.get(entry.rsid);
     if (!snp) continue;
 
@@ -501,10 +508,11 @@ function generateExecutiveSummary(
 export function analyse(
   genome: ParsedGenome,
   database: SnpDatabase,
-  config?: Partial<GenomicReportConfig>
+  config?: Partial<GenomicReportConfig>,
+  onProgress?: (current: number, total: number) => void
 ): AnalysisResult {
   const apoe = determineApoe(genome);
-  let variants = crossReference(genome, database);
+  let variants = crossReference(genome, database, onProgress);
 
   // Apply filters
   if (config?.filters?.onlyRiskAlleles) {
