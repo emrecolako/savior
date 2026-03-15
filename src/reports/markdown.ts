@@ -1,4 +1,4 @@
-import type { AnalysisResult, MatchedVariant, ReportConfig } from "../types.js";
+import type { AnalysisResult, MatchedVariant, PathwayConvergence, ReportConfig, DrugInteraction } from "../types.js";
 import { writeFileSync } from "node:fs";
 
 function ordinalSuffix(n: number): string {
@@ -15,6 +15,13 @@ const SEVERITY_EMOJI: Record<string, string> = {
   protective: "🟢",
   carrier: "🟤",
   informational: "⚪",
+};
+
+const RISK_BADGE: Record<string, string> = {
+  high: "🔴 HIGH",
+  elevated: "🟠 ELEVATED",
+  moderate: "🟡 MODERATE",
+  low: "🔵 LOW",
 };
 
 function variantTable(variants: MatchedVariant[], includeResearch = false): string {
@@ -45,6 +52,35 @@ function variantTable(variants: MatchedVariant[], includeResearch = false): stri
   return lines.join("\n") + "\n";
 }
 
+function pathwaySection(p: PathwayConvergence): string {
+  const lines: string[] = [];
+  const badge = RISK_BADGE[p.riskLevel] ?? p.riskLevel.toUpperCase();
+
+  lines.push(`### ${p.name} — ${badge} (Score: ${p.synergyScore}/100)\n`);
+  lines.push(`${p.narrative}\n`);
+
+  if (p.compoundEffects.length > 0) {
+    lines.push(`> **Compound Effects:**`);
+    for (const effect of p.compoundEffects) {
+      lines.push(`> - ${effect}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(`**Involved genes:** ${p.involvedGenes.join(", ")}\n`);
+  lines.push(variantTable(p.variants));
+
+  if (p.actions.length > 0) {
+    lines.push(`**Recommended actions:**`);
+    for (const action of p.actions) {
+      lines.push(`- ${action}`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
+}
+
 export function generateMarkdown(result: AnalysisResult, config: ReportConfig): string {
   const lines: string[] = [];
   const name = config.subjectName ?? "Subject";
@@ -56,7 +92,7 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
 
   lines.push(`> **Disclaimer:** This report is for research and educational purposes only. It is not a clinical diagnosis. Always discuss findings with a qualified healthcare provider.\n`);
 
-  // ── Executive Summary ──
+  // ── Key Findings (executive summary) ──
   if (result.executiveSummary && result.executiveSummary.length > 0) {
     lines.push(`## Key Findings\n`);
     for (const bullet of result.executiveSummary) {
@@ -123,24 +159,22 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
     }
   }
 
-  // ── Plain-English Summary (merged with pathway convergence) ──
+  // ── Executive Summary ──
   if (config.includeSummary) {
-    lines.push(`## Summary\n`);
+    lines.push(`## Executive Summary\n`);
 
-    const pathwaySummaries = result.pathways
+    const topPathways = result.pathways
       .filter((p) => p.riskLevel !== "low")
-      .sort((a, b) => {
-        const rank: Record<string, number> = { high: 0, elevated: 1, moderate: 2, low: 3 };
-        return (rank[a.riskLevel] ?? 9) - (rank[b.riskLevel] ?? 9);
-      });
+      .slice(0, 5); // already sorted by synergy score
 
-    for (const p of pathwaySummaries) {
-      const icon = p.riskLevel === "high" ? "🔴" : p.riskLevel === "elevated" ? "🟠" : "🟡";
-      lines.push(`### ${icon} ${p.name} — ${p.riskLevel.toUpperCase()} risk\n`);
-      lines.push(`${p.assessment}\n`);
-      // Include gene list (previously only in the redundant Pathway Convergence section)
-      const genes = [...new Set(p.variants.map((v) => v.gene))];
-      lines.push(`**Key genes:** ${genes.slice(0, 10).join(", ")}${genes.length > 10 ? ` and ${genes.length - 10} more` : ""}\n`);
+    if (topPathways.length === 0) {
+      lines.push(`No elevated pathway-level risks identified.\n`);
+    } else {
+      for (const p of topPathways) {
+        const badge = RISK_BADGE[p.riskLevel] ?? p.riskLevel.toUpperCase();
+        lines.push(`- ${badge} **${p.name}** — ${p.variants.length} variant(s) across ${p.involvedGenes.length} gene(s), score ${p.synergyScore}/100`);
+      }
+      lines.push("");
     }
 
     // Pharma summary — enhanced with table format
@@ -160,8 +194,79 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
     }
   }
 
-  // ── Variants by severity ──
+  // ── Pathway Analysis (primary body) ──
+  if (config.includePathways) {
+    lines.push(`## Pathway Analysis\n`);
+    lines.push(`Variants are clustered by biological pathway to reveal compound effects that isolated SNP analysis misses. Pathways are ranked by synergy score, which accounts for variant severity, zygosity, and multi-gene interactions.\n`);
+
+    for (const p of result.pathways) {
+      lines.push(pathwaySection(p));
+    }
+  }
+
+  // ── Pharmacogenomics Drug-Gene Matrix ──
+  if (result.pharmacogenomics) {
+    const pgx = result.pharmacogenomics;
+    lines.push(`## Pharmacogenomics: Drug-Gene Interaction Matrix\n`);
+
+    // Metabolizer summary table
+    lines.push(`### Metaboliser Profile\n`);
+    lines.push(`| Enzyme | Phenotype | Activity | Diplotype |`);
+    lines.push(`|--------|-----------|----------|-----------|`);
+    for (const g of pgx.genes) {
+      const phLabel = g.phenotype === "normal" ? "Normal" :
+        g.phenotype === "poor" ? "**POOR**" :
+        g.phenotype === "intermediate" ? "**Intermediate**" :
+        g.phenotype === "ultra-rapid" ? "**Ultra-Rapid**" :
+        g.phenotype === "rapid" ? "**Rapid**" : "Indeterminate";
+      const act = g.activityScore !== null ? String(g.activityScore) : "—";
+      lines.push(`| **${g.gene}** | ${phLabel} | ${act} | ${g.diplotype} |`);
+    }
+    lines.push("");
+
+    // Drug interaction matrix grouped by class
+    lines.push(`### Drug Interactions\n`);
+    const drugClasses = new Map<string, DrugInteraction[]>();
+    for (const di of pgx.interactions) {
+      const group = drugClasses.get(di.drugClass) ?? [];
+      group.push(di);
+      drugClasses.set(di.drugClass, group);
+    }
+
+    for (const [cls, drugs] of drugClasses) {
+      lines.push(`#### ${cls}\n`);
+      lines.push(`| Medication | Enzyme | Action | Detail |`);
+      lines.push(`|-----------|--------|--------|--------|`);
+      for (const di of drugs) {
+        const actionLabel = di.action === "avoid" ? "**AVOID**" :
+          di.action === "use alternative" ? "**USE ALTERNATIVE**" :
+          di.action === "use standard dose" ? "Standard dose" :
+          di.action;
+        lines.push(`| ${di.drug} | ${di.primaryGene} | ${actionLabel} | ${di.detail} |`);
+      }
+      lines.push("");
+    }
+
+    // Highlight actionable alerts
+    const actionable = pgx.interactions.filter(
+      (di) => di.action !== "use standard dose" && di.action !== "no actionable variant detected" && di.action !== "see notes"
+    );
+    if (actionable.length > 0) {
+      lines.push(`### Actionable Alerts\n`);
+      for (const di of actionable) {
+        lines.push(`- **${di.drug}** (${di.primaryGene}): ${di.action} — ${di.detail}`);
+      }
+      lines.push("");
+    }
+
+    lines.push("> _A standalone GP card can be exported via: `genomic-report gp-card -i <genome> -o card.md`_\n");
+  }
+
+  // ── Individual Variant Reference (appendix) ──
   if (config.includeRawVariants) {
+    lines.push(`## Appendix: Individual Variant Reference\n`);
+    lines.push(`_Variants listed by severity for reference. See Pathway Analysis above for biological context._\n`);
+
     const severities = ["critical", "high", "moderate", "low", "protective", "carrier", "informational"] as const;
     const labels: Record<string, string> = {
       critical: "Critical — Immediate Clinical Relevance",
@@ -182,7 +287,7 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
       );
       if (svars.length === 0) continue;
 
-      lines.push(`## ${SEVERITY_EMOJI[sev]} ${labels[sev]}\n`);
+      lines.push(`### ${SEVERITY_EMOJI[sev]} ${labels[sev]}\n`);
       lines.push(`_${svars.length} variant(s) flagged_\n`);
 
       if (svars.length <= MAX_UNGROUPED) {
@@ -224,8 +329,8 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
   // ── Methodology ──
   if (config.includeMethodology) {
     lines.push(`## Methodology & Limitations\n`);
-    lines.push(`This analysis cross-referenced ${result.totalSnps.toLocaleString()} SNPs against a curated database of clinically significant variants drawn from ClinVar, GWAS Catalog, PharmGKB, CPIC guidelines, and published meta-analyses.\n`);
-    lines.push(`**Limitations:** (1) Consumer arrays cover ~640K of ~10M+ common variants. (2) Cannot detect CNVs, structural variants, or repeat expansions. (3) Odds ratios are population-level statistics. (4) HLA typing from tag SNPs is approximate. For clinical-grade analysis, consider whole exome/genome sequencing with a genetic counsellor.\n`);
+    lines.push(`This analysis cross-referenced ${result.totalSnps.toLocaleString()} SNPs against a curated database of clinically significant variants drawn from ClinVar, GWAS Catalog, PharmGKB, CPIC guidelines, and published meta-analyses. Variants are clustered into ${result.pathways.length} biological pathways with synergy-aware scoring that accounts for multi-gene interactions, zygosity, and variant severity.\n`);
+    lines.push(`**Limitations:** (1) Consumer arrays cover ~640K of ~10M+ common variants. (2) Cannot detect CNVs, structural variants, or repeat expansions. (3) Odds ratios are population-level statistics. (4) HLA typing from tag SNPs is approximate. (5) Pathway synergy scores are heuristic, not validated polygenic risk scores. For clinical-grade analysis, consider whole exome/genome sequencing with a genetic counsellor.\n`);
 
     if (config.includeRecentLiterature) {
       lines.push(`Research enrichment via PubMed E-utilities (last 2 years). Research queries use variant rsIDs and gene names only — no genotype data is transmitted.\n`);

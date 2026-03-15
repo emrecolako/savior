@@ -24,6 +24,10 @@ export function writeJsonReport(result: AnalysisResult, config: ReportConfig): v
       variants: p.variants, // full variant objects for dashboard consumption
     })),
     actionItems: result.actionItems,
+    pharmacogenomics: {
+      metaboliserProfile: result.pharmacogenomics.genes,
+      drugInteractions: result.pharmacogenomics.interactions,
+    },
     prs: result.prs ?? null,
   };
 
