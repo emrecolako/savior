@@ -124,6 +124,89 @@ export interface PathwayConvergence {
   assessment: string;
   riskLevel: "low" | "moderate" | "elevated" | "high";
   actions: string[];
+  synergyScore: number;        // 0-100 composite score
+  compoundEffects: string[];   // gene-gene interaction descriptions
+  narrative: string;           // human-readable pathway explanation
+  involvedGenes: string[];     // deduplicated gene list
+}
+
+export interface PathwayActionTemplate {
+  priority: ActionItem["priority"];
+  category: ActionItem["category"];
+  title: string;
+  detail: string;
+  minRiskLevel: PathwayConvergence["riskLevel"];
+}
+
+export interface PathwayDefinition {
+  name: string;
+  slug: string;
+  description: string;
+  genePatterns: string[];
+  keywords: string[];
+  categories: Category[];
+  tags: string[];                                    // match on SNP tags field
+  interactionNotes: Record<string, string>;          // "GENE1+GENE2" → explanation
+  synergyMultiplier: number;                         // base multiplier when >1 gene hit
+  homozygousPenalty: number;                         // extra weight for homozygous
+  narrativeTemplate: string;                         // template with {{placeholders}}
+  actionTemplates: PathwayActionTemplate[];
+}
+
+// ─── Pharmacogenomics ─────────────────────────────────────────
+
+export type MetabolizerPhenotype =
+  | "ultra-rapid"
+  | "rapid"
+  | "normal"
+  | "intermediate"
+  | "poor"
+  | "indeterminate";
+
+export type PgxGene =
+  | "CYP2D6"
+  | "CYP2C19"
+  | "CYP2C9"
+  | "CYP3A4"
+  | "CYP3A5"
+  | "CYP1A2"
+  | "DPYD"
+  | "TPMT"
+  | "SLCO1B1"
+  | "UGT1A1"
+  | "ABCB1";
+
+export type DrugAction =
+  | "use standard dose"
+  | "use with caution"
+  | "consider dose reduction"
+  | "consider dose increase"
+  | "use alternative"
+  | "avoid"
+  | "no actionable variant detected"
+  | "see notes";
+
+export interface DrugInteraction {
+  drug: string;
+  drugClass: string;
+  primaryGene: PgxGene;
+  action: DrugAction;
+  detail: string;
+  evidence: string;
+}
+
+export interface GeneMetabolizerStatus {
+  gene: PgxGene;
+  phenotype: MetabolizerPhenotype;
+  activityScore: number | null;    // CPIC-style 0-3+ ; null if not applicable
+  detectedVariants: string[];      // rsids found in this individual
+  diplotype: string;               // e.g. "*1/*2", "normal/normal"
+  explanation: string;
+}
+
+export interface DrugGeneMatrix {
+  genes: GeneMetabolizerStatus[];
+  interactions: DrugInteraction[];
 }
 
 export interface AnalysisResult {
@@ -142,6 +225,7 @@ export interface AnalysisResult {
   // Derived
   pathways: PathwayConvergence[];
   actionItems: ActionItem[];
+  pharmacogenomics: DrugGeneMatrix;
 }
 
 export interface ActionItem {

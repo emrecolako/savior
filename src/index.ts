@@ -31,9 +31,10 @@ export { loadDatabase, filterDatabase } from "./database/loader.js";
 
 // Analysis
 export { analyse, crossReference, determineApoe, detectPathways, generateActionItems } from "./analysis/engine.js";
+export { buildDrugGeneMatrix } from "./analysis/metabolizers.js";
 
 // Reports
-export { generateReport, writeMarkdownReport, generateMarkdown, writeJsonReport } from "./reports/index.js";
+export { generateReport, writeMarkdownReport, generateMarkdown, writeJsonReport, writeGpCard, writeGpCardJsonFile, generateGpCardMarkdown, generateGpCardJson } from "./reports/index.js";
 
 // Types
 export type * from "./types.js";

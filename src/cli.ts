@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { parseGenome } from "./parsers/index.js";
 import { loadDatabase } from "./database/loader.js";
 import { analyse } from "./analysis/engine.js";
-import { generateReport } from "./reports/index.js";
+import { generateReport, writeGpCard, writeGpCardJsonFile } from "./reports/index.js";
 import type { ReportFormat, InputFormat, Severity, Category } from "./types.js";
 
 const program = new Command();
@@ -58,6 +58,7 @@ program
       console.log(`  Matched: ${result.matchedCount} clinically significant variants`);
       console.log(`  APOE:    ${result.apoe.diplotype}`);
       console.log(`  Pathways: ${result.pathways.length} convergent pathways detected`);
+      console.log(`  PGx:     ${result.pharmacogenomics.genes.length} enzymes profiled, ${result.pharmacogenomics.interactions.length} drug interactions evaluated`);
       console.log(`  Actions: ${result.actionItems.length} action items generated\n`);
 
       console.log(`Generating ${opts.reportFormat} report → ${opts.output}`);
@@ -109,6 +110,63 @@ program
       console.log(`    ${sev.padEnd(20)} ${count}`);
     }
     console.log("");
+  });
+
+program
+  .command("gp-card")
+  .description("Generate a pharmacogenomics GP alert card (standalone, hand to your doctor)")
+  .requiredOption("-i, --input <path>", "Path to raw genome file")
+  .option("-f, --format <format>", "Input format: 23andme, ancestrydna, vcf, generic-tsv")
+  .option("-o, --output <path>", "Output file path", "gp-card.md")
+  .option("-r, --report-format <format>", "Card format: markdown or json", "markdown")
+  .option("-n, --name <name>", "Patient name for the card", "Patient")
+  .option("-d, --database <path>", "Path to custom SNP database JSON")
+  .option("--supplementary <paths...>", "Additional SNP database files to merge")
+  .action((opts) => {
+    try {
+      console.log(`\n💊 Pharmacogenomics GP Card Generator\n`);
+      console.log(`Parsing: ${opts.input}`);
+
+      const genome = parseGenome(opts.input, opts.format as InputFormat | undefined);
+      console.log(`  Format: ${genome.format} | SNPs: ${genome.totalSnps.toLocaleString()}\n`);
+
+      console.log(`Loading SNP database...`);
+      const db = loadDatabase(opts.database, opts.supplementary);
+
+      console.log(`Analysing pharmacogenomics profile...`);
+      const result = analyse(genome, db, {
+        input: { filePath: opts.input },
+      } as any);
+
+      const pgx = result.pharmacogenomics;
+      const actionable = pgx.interactions.filter(
+        (di) => di.action !== "use standard dose" && di.action !== "no actionable variant detected" && di.action !== "see notes"
+      );
+
+      console.log(`  Enzymes profiled: ${pgx.genes.length}`);
+      console.log(`  Drug interactions: ${pgx.interactions.length}`);
+      console.log(`  Actionable alerts: ${actionable.length}\n`);
+
+      // Summary
+      for (const g of pgx.genes) {
+        if (g.phenotype !== "normal" && g.phenotype !== "indeterminate") {
+          console.log(`  ⚠️  ${g.gene}: ${g.phenotype} metaboliser (${g.diplotype})`);
+        }
+      }
+      console.log("");
+
+      if (opts.reportFormat === "json") {
+        writeGpCardJsonFile(result, opts.output, opts.name);
+      } else {
+        writeGpCard(result, opts.output, opts.name);
+      }
+
+      console.log(`Wrote ${opts.reportFormat} GP card → ${opts.output}`);
+      console.log(`✅ Print this card and hand it to your GP or pharmacist.\n`);
+    } catch (err: any) {
+      console.error(`\n❌ Error: ${err.message}\n`);
+      process.exit(1);
+    }
   });
 
 program.parse();

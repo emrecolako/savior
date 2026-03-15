@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
 import { crossReference, determineApoe, detectPathways } from "../src/analysis/engine.js";
+import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
 
 const TMP = join(tmpdir(), "genomic-report-tests");
@@ -149,9 +150,250 @@ describe("Pathway convergence", () => {
     const variants = crossReference(genome, TEST_DB);
     const pathways = detectPathways(variants);
 
-    // Should detect pharmacogenomics pathway (CYP2C9 + COMT)
-    const pharma = pathways.find((p) => p.slug === "pharma");
-    expect(pharma).toBeDefined();
-    expect(pharma!.variants.length).toBeGreaterThanOrEqual(1);
+    // CYP2C9 should match detox-phase1 pathway; COMT matches methylation and catecholamine
+    const detox = pathways.find((p) => p.slug === "detox-phase1");
+    expect(detox).toBeDefined();
+    expect(detox!.variants.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calculates synergy score and populates new fields", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+
+    for (const p of pathways) {
+      expect(typeof p.synergyScore).toBe("number");
+      expect(p.synergyScore).toBeGreaterThanOrEqual(0);
+      expect(p.synergyScore).toBeLessThanOrEqual(100);
+      expect(Array.isArray(p.compoundEffects)).toBe(true);
+      expect(typeof p.narrative).toBe("string");
+      expect(p.narrative.length).toBeGreaterThan(0);
+      expect(Array.isArray(p.involvedGenes)).toBe(true);
+      expect(p.involvedGenes.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("scores multi-gene pathways higher than single-gene via synergy", () => {
+    // Create a test DB with two pathway-tagged variants from different genes
+    const multiGeneDb: SnpDatabase = {
+      version: "test",
+      lastUpdated: "2026-01-01",
+      entries: [
+        {
+          rsid: "rs1801133",
+          gene: "MTHFR",
+          riskAllele: "T",
+          condition: "MTHFR C677T — reduced folate metabolism",
+          category: "nutrigenomic",
+          severity: "moderate",
+          evidenceLevel: "Large GWAS",
+          notes: "Reduced enzyme activity.",
+          tags: ["pathway:methylation"],
+        },
+        {
+          rsid: "rs4680",
+          gene: "COMT",
+          riskAllele: "A",
+          condition: "COMT Val158Met — catecholamine metabolism",
+          category: "pharmacogenomics",
+          severity: "moderate",
+          evidenceLevel: "Large GWAS",
+          notes: "Met/Met = slower dopamine clearance.",
+          tags: ["pathway:methylation", "pathway:catecholamine"],
+        },
+      ],
+    };
+
+    const singleGeneDb: SnpDatabase = {
+      version: "test",
+      lastUpdated: "2026-01-01",
+      entries: [
+        multiGeneDb.entries[0], // only MTHFR
+      ],
+    };
+
+    // Create genome with both SNPs
+    const data = `# test\nrs1801133\t1\t11856378\tTT\nrs4680\t22\t19951271\tAA\n`;
+    const path = join(TMP, "synergy-test.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+
+    const multiPathways = detectPathways(crossReference(genome, multiGeneDb));
+    const singlePathways = detectPathways(crossReference(genome, singleGeneDb));
+
+    const multiMeth = multiPathways.find((p) => p.slug === "methylation");
+    const singleMeth = singlePathways.find((p) => p.slug === "methylation");
+
+    expect(multiMeth).toBeDefined();
+    expect(singleMeth).toBeDefined();
+    // Multi-gene should score higher due to synergy multiplier
+    expect(multiMeth!.synergyScore).toBeGreaterThan(singleMeth!.synergyScore);
+  });
+
+  it("detects compound effects when interacting genes are present", () => {
+    const db: SnpDatabase = {
+      version: "test",
+      lastUpdated: "2026-01-01",
+      entries: [
+        {
+          rsid: "rs1801133",
+          gene: "MTHFR",
+          riskAllele: "T",
+          condition: "MTHFR C677T — reduced folate metabolism",
+          category: "nutrigenomic",
+          severity: "moderate",
+          evidenceLevel: "Large GWAS",
+          notes: "Reduced enzyme activity.",
+          tags: ["pathway:methylation"],
+        },
+        {
+          rsid: "rs4680",
+          gene: "COMT",
+          riskAllele: "A",
+          condition: "COMT Val158Met — catecholamine metabolism",
+          category: "pharmacogenomics",
+          severity: "moderate",
+          evidenceLevel: "Large GWAS",
+          notes: "Met/Met = slower dopamine clearance.",
+          tags: ["pathway:methylation"],
+        },
+      ],
+    };
+
+    const data = `# test\nrs1801133\t1\t11856378\tTT\nrs4680\t22\t19951271\tAA\n`;
+    const path = join(TMP, "compound-test.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+
+    const pathways = detectPathways(crossReference(genome, db));
+    const meth = pathways.find((p) => p.slug === "methylation");
+
+    expect(meth).toBeDefined();
+    // MTHFR+COMT interaction note should be detected
+    expect(meth!.compoundEffects.length).toBeGreaterThan(0);
+    expect(meth!.compoundEffects[0]).toContain("COMT");
+  });
+
+  it("sorts pathways by synergy score descending", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+
+    for (let i = 1; i < pathways.length; i++) {
+      expect(pathways[i - 1].synergyScore).toBeGreaterThanOrEqual(pathways[i].synergyScore);
+    }
+  });
+});
+
+// ─── Pharmacogenomics / Drug-Gene Matrix ─────────────────────
+
+describe("Drug-gene interaction matrix", () => {
+  it("returns metabolizer status for all 11 PGx genes", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const matrix = buildDrugGeneMatrix(genome, variants);
+
+    expect(matrix.genes.length).toBe(11);
+    const geneNames = matrix.genes.map((g) => g.gene);
+    expect(geneNames).toContain("CYP2D6");
+    expect(geneNames).toContain("CYP2C19");
+    expect(geneNames).toContain("CYP2C9");
+    expect(geneNames).toContain("CYP3A4");
+    expect(geneNames).toContain("CYP3A5");
+    expect(geneNames).toContain("CYP1A2");
+    expect(geneNames).toContain("DPYD");
+    expect(geneNames).toContain("TPMT");
+    expect(geneNames).toContain("SLCO1B1");
+    expect(geneNames).toContain("UGT1A1");
+    expect(geneNames).toContain("ABCB1");
+  });
+
+  it("detects CYP2C9 intermediate metabolizer from heterozygous *2", () => {
+    // Test genome has rs1799853=CT (CYP2C9*2 heterozygous)
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const matrix = buildDrugGeneMatrix(genome, variants);
+
+    const cyp2c9 = matrix.genes.find((g) => g.gene === "CYP2C9")!;
+    expect(cyp2c9).toBeDefined();
+    expect(cyp2c9.phenotype).toBe("intermediate");
+    expect(cyp2c9.detectedVariants).toContain("rs1799853");
+    expect(cyp2c9.activityScore).toBeLessThan(2);
+  });
+
+  it("generates drug interactions for every medication", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const matrix = buildDrugGeneMatrix(genome, variants);
+
+    // Should have interactions for many medications
+    expect(matrix.interactions.length).toBeGreaterThan(25);
+
+    // Every interaction has required fields
+    for (const di of matrix.interactions) {
+      expect(di.drug).toBeTruthy();
+      expect(di.drugClass).toBeTruthy();
+      expect(di.primaryGene).toBeTruthy();
+      expect(di.action).toBeTruthy();
+      expect(di.detail).toBeTruthy();
+      expect(di.evidence).toBeTruthy();
+    }
+  });
+
+  it("flags warfarin dose reduction for CYP2C9 intermediate metabolizer", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const matrix = buildDrugGeneMatrix(genome, variants);
+
+    const warfarin = matrix.interactions.find((di) => di.drug === "Warfarin");
+    expect(warfarin).toBeDefined();
+    expect(warfarin!.action).toBe("consider dose reduction");
+  });
+
+  it("returns normal phenotype when no variant alleles are present", () => {
+    // Genome with no PGx variant alleles
+    const data = `# test\nrs429358\t19\t45411941\tTT\n`;
+    const path = join(TMP, "pgx-normal.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    // All genes should default to normal (wildtype)
+    for (const g of matrix.genes) {
+      expect(g.phenotype).toBe("normal");
+      expect(g.diplotype).toBe("*1/*1");
+    }
+  });
+
+  it("detects homozygous poor metabolizer correctly", () => {
+    // CYP2C19 *2/*2 (rs4244285 AA = homozygous variant)
+    const data = `# test\nrs4244285\t10\t96541616\tAA\n`;
+    const path = join(TMP, "pgx-pm.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    const cyp2c19 = matrix.genes.find((g) => g.gene === "CYP2C19")!;
+    expect(cyp2c19.phenotype).toBe("poor");
+    expect(cyp2c19.activityScore).toBe(0);
+
+    // Clopidogrel should be flagged as use alternative
+    const clopidogrel = matrix.interactions.find((di) => di.drug === "Clopidogrel");
+    expect(clopidogrel).toBeDefined();
+    expect(clopidogrel!.action).toBe("use alternative");
+  });
+
+  it("groups interactions by drug class", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const matrix = buildDrugGeneMatrix(genome, variants);
+
+    const classes = new Set(matrix.interactions.map((di) => di.drugClass));
+    expect(classes.has("SSRIs")).toBe(true);
+    expect(classes.has("Statins")).toBe(true);
+    expect(classes.has("NSAIDs")).toBe(true);
+    expect(classes.has("Beta-blockers")).toBe(true);
+    expect(classes.has("Opioid analgesics")).toBe(true);
+    expect(classes.has("Anticoagulants")).toBe(true);
   });
 });
