@@ -31,7 +31,10 @@ program
   .option("--no-summary", "Omit the plain-English summary section")
   .option("--no-pathways", "Omit pathway convergence analysis")
   .option("--no-actions", "Omit prioritised action list")
-  .action((opts) => {
+  .option("--research", "Enrich findings with live PubMed research (requires internet)")
+  .option("--research-provider <provider>", "Research provider: pubmed", "pubmed")
+  .option("--max-research <n>", "Max research results per variant", "3")
+  .action(async (opts) => {
     try {
       console.log(`\n🧬 genomic-report v0.1.0\n`);
       console.log(`Parsing: ${opts.input}`);
@@ -60,6 +63,20 @@ program
       console.log(`  Pathways: ${result.pathways.length} convergent pathways detected`);
       console.log(`  Actions: ${result.actionItems.length} action items generated\n`);
 
+      if (opts.research) {
+        console.log("Researching variants via PubMed...");
+        const { enrichWithResearch } = await import("./research/index.js");
+        await enrichWithResearch(result.variants, {
+          provider: opts.researchProvider as any,
+          apiKey: process.env.PUBMED_API_KEY,
+          maxResultsPerVariant: Number(opts.maxResearch) || 3,
+          minYear: new Date().getFullYear() - 2,
+          enabled: true,
+        });
+        const enriched = result.variants.filter(v => v.recentFindings && v.recentFindings.length > 0);
+        console.log(`  Found research for ${enriched.length} variant(s)\n`);
+      }
+
       console.log(`Generating ${opts.reportFormat} report → ${opts.output}`);
       generateReport(result, {
         format: opts.reportFormat as ReportFormat,
@@ -68,7 +85,7 @@ program
         includeRawVariants: true,
         includePathways: opts.pathways !== false,
         includeActionItems: opts.actions !== false,
-        includeRecentLiterature: false, // requires research module
+        includeRecentLiterature: !!opts.research,
         includeMethodology: true,
         subjectName: opts.name,
       });

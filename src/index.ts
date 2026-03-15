@@ -35,5 +35,8 @@ export { analyse, crossReference, determineApoe, detectPathways, generateActionI
 // Reports
 export { generateReport, writeMarkdownReport, generateMarkdown, writeJsonReport } from "./reports/index.js";
 
+// Research
+export { enrichWithResearch } from "./research/index.js";
+
 // Types
 export type * from "./types.js";
