@@ -7,6 +7,12 @@ import { analyse } from "./analysis/engine.js";
 import { generateReport } from "./reports/index.js";
 import type { ReportFormat, InputFormat, Severity, Category } from "./types.js";
 
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 const program = new Command();
 
 program
@@ -31,6 +37,9 @@ program
   .option("--no-summary", "Omit the plain-English summary section")
   .option("--no-pathways", "Omit pathway convergence analysis")
   .option("--no-actions", "Omit prioritised action list")
+  .option("--no-prs", "Skip polygenic risk score computation")
+  .option("--prs-traits <traits...>", "Specific PRS traits to compute (default: all)")
+  .option("--pgs-data <path>", "Path to custom PGS scoring data directory")
   .action((opts) => {
     try {
       console.log(`\n🧬 genomic-report v0.1.0\n`);
@@ -48,6 +57,11 @@ program
       console.log(`Analysing...`);
       const result = analyse(genome, db, {
         input: { filePath: opts.input },
+        prs: {
+          enabled: opts.prs !== false,
+          traits: opts.prsTraits as string[] | undefined,
+          scoringDataPath: opts.pgsData as string | undefined,
+        },
         filters: {
           minSeverity: opts.minSeverity as Severity | undefined,
           categories: opts.categories as Category[] | undefined,
@@ -58,7 +72,18 @@ program
       console.log(`  Matched: ${result.matchedCount} clinically significant variants`);
       console.log(`  APOE:    ${result.apoe.diplotype}`);
       console.log(`  Pathways: ${result.pathways.length} convergent pathways detected`);
-      console.log(`  Actions: ${result.actionItems.length} action items generated\n`);
+      console.log(`  Actions: ${result.actionItems.length} action items generated`);
+
+      if (result.prs && result.prs.traits.length > 0) {
+        console.log(`\nPolygenic Risk Scores:`);
+        for (const t of result.prs.traits) {
+          const pct = Math.round(t.percentile);
+          const cat = t.riskCategory.toUpperCase().padEnd(13);
+          const coverage = `${t.variantsUsed}/${t.variantsTotal}`;
+          console.log(`  ${t.traitName.padEnd(30)} ${String(pct).padStart(3)}${ordinalSuffix(pct)} percentile (${cat}) [${coverage} variants]`);
+        }
+      }
+      console.log("");
 
       console.log(`Generating ${opts.reportFormat} report → ${opts.output}`);
       generateReport(result, {
@@ -70,6 +95,7 @@ program
         includeActionItems: opts.actions !== false,
         includeRecentLiterature: false, // requires research module
         includeMethodology: true,
+        includePrs: opts.prs !== false,
         subjectName: opts.name,
       });
 

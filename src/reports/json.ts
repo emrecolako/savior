@@ -24,6 +24,7 @@ export function writeJsonReport(result: AnalysisResult, config: ReportConfig): v
       variants: p.variants.map((v) => v.rsid), // de-duplicate — just rsids
     })),
     actionItems: result.actionItems,
+    prs: result.prs ?? null,
   };
 
   writeFileSync(config.outputPath, JSON.stringify(output, null, 2), "utf-8");
