@@ -1,6 +1,6 @@
 {
   "name": "genomic-report",
-  "version": "0.1.0",
+  "version": "0.1.0.1",
   "description": "Comprehensive personal genomic analysis — parse raw DNA data, cross-reference clinically significant variants, search latest research, generate actionable reports.",
   "keywords": ["genomics", "23andme", "ancestry", "snp", "pharmacogenomics", "gwas", "genetic-analysis"],
   "license": "MIT",
