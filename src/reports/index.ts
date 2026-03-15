@@ -29,3 +29,4 @@ export function generateReport(result: AnalysisResult, config: ReportConfig): vo
 
 export { writeMarkdownReport, generateMarkdown } from "./markdown.js";
 export { writeJsonReport } from "./json.js";
+export { writeGpCard, writeGpCardJsonFile, generateGpCardMarkdown, generateGpCardJson } from "./gp-card.js";

@@ -8,9 +8,12 @@ import type {
   AnalysisResult,
   ActionItem,
   PathwayConvergence,
+  PathwayDefinition,
   GenomicReportConfig,
   PrsResult,
 } from "../types.js";
+import { PATHWAY_DEFINITIONS } from "./pathways.js";
+import { buildDrugGeneMatrix } from "./metabolizers.js";
 import { computeAllPrs } from "./prs-engine.js";
 
 // ─── Zygosity determination ─────────────────────────────────────
@@ -146,100 +149,141 @@ export function crossReference(genome: ParsedGenome, database: SnpDatabase): Mat
 
 // ─── Pathway convergence detection ──────────────────────────────
 
-const PATHWAY_DEFINITIONS = [
-  {
-    name: "Coronary Artery Disease / Atherosclerosis",
-    slug: "cad",
-    keywords: ["coronary", "cad", "ldl", "cholesterol", "atherosclerosis", "myocardial", "9p21"],
-    categories: ["cardiovascular"] as string[],
-    genePatterns: ["9p21", "SORT1", "PCSK9", "LDLR", "LPA", "CXCL12", "MIA3", "WDR12", "MTHFD1L"],
-  },
-  {
-    name: "Atrial Fibrillation",
-    slug: "af",
-    keywords: ["atrial fibrillation"],
-    categories: ["cardiovascular"],
-    genePatterns: ["PITX2", "4q25", "KCNN3", "ZFHX3"],
-  },
-  {
-    name: "Type 2 Diabetes / Metabolic Syndrome",
-    slug: "t2d",
-    keywords: ["diabetes", "obesity", "bmi", "insulin", "metabolic"],
-    categories: ["metabolic"],
-    genePatterns: ["TCF7L2", "FTO", "MC4R", "KCNJ11", "PPARG", "SLC30A8", "CDKAL1", "IGF2BP2"],
-  },
-  {
-    name: "Autoimmune / Inflammatory",
-    slug: "autoimmune",
-    keywords: ["autoimmune", "rheumatoid", "crohn", "celiac", "psoriasis", "lupus", "inflammatory"],
-    categories: ["autoimmune"],
-    genePatterns: ["HLA-", "PTPN22", "CTLA4", "IL23R", "ATG16L1", "NOD2", "IL2RA"],
-  },
-  {
-    name: "Macular Degeneration / Vision",
-    slug: "amd",
-    keywords: ["macular", "glaucoma", "amd", "vision"],
-    categories: ["ophthalmological"],
-    genePatterns: ["CFH", "ARMS2", "HTRA1", "C3", "VEGFA"],
-  },
-  {
-    name: "Liver / Hepatic",
-    slug: "liver",
-    keywords: ["liver", "nafld", "nash", "hepatic", "gilbert"],
-    categories: ["hepatic"],
-    genePatterns: ["PNPLA3", "TM6SF2", "UGT1A1"],
-  },
-  {
-    name: "Methylation / Folate Metabolism",
-    slug: "methylation",
-    keywords: ["folate", "methylation", "homocysteine", "mthfr"],
-    categories: ["nutrigenomic"],
-    genePatterns: ["MTHFR", "MTHFD1L", "MTR", "MTRR", "COMT"],
-  },
-  {
-    name: "Pharmacogenomics",
-    slug: "pharma",
-    keywords: ["metabolizer", "drug", "warfarin", "statin"],
-    categories: ["pharmacogenomics"],
-    genePatterns: ["CYP", "SLCO", "DPYD", "TPMT", "UGT1A1", "ABCB1", "HLA-"],
-  },
-];
+const SEVERITY_WEIGHT: Record<string, number> = {
+  critical: 5, high: 4, moderate: 3, low: 2,
+  protective: -2, carrier: 1, informational: 0,
+};
+
+const MAX_VARIANTS_PER_GENE = 3; // cap to prevent single-gene inflation (e.g. ABCB1)
+
+function matchVariantToPathway(v: MatchedVariant, def: PathwayDefinition): boolean {
+  // Primary: tag-based matching
+  if (v.tags?.some((t) => def.tags.includes(t))) return true;
+  // Fallback: keyword / gene / category matching
+  const condLower = v.condition.toLowerCase();
+  const geneLower = v.gene.toLowerCase();
+  const matchesKeyword = def.keywords.some((k) => condLower.includes(k));
+  const matchesGene = def.genePatterns.some(
+    (p) => v.gene.startsWith(p) || geneLower.includes(p.toLowerCase())
+  );
+  const matchesCategory = def.categories.includes(v.category as any);
+  return matchesKeyword || matchesGene || matchesCategory;
+}
+
+function calculatePathwayScore(variants: MatchedVariant[], def: PathwayDefinition): number {
+  // Cap per-gene contribution to prevent inflation
+  const geneGroups = new Map<string, MatchedVariant[]>();
+  for (const v of variants) {
+    const group = geneGroups.get(v.gene) ?? [];
+    group.push(v);
+    geneGroups.set(v.gene, group);
+  }
+
+  let rawScore = 0;
+  for (const [, group] of geneGroups) {
+    const sorted = [...group].sort(
+      (a, b) => (SEVERITY_WEIGHT[b.severity] ?? 0) - (SEVERITY_WEIGHT[a.severity] ?? 0)
+    );
+    for (const v of sorted.slice(0, MAX_VARIANTS_PER_GENE)) {
+      let vScore = SEVERITY_WEIGHT[v.severity] ?? 1;
+      if (v.riskAlleleCount === 2) vScore *= def.homozygousPenalty;
+      rawScore += vScore;
+    }
+  }
+
+  // Synergy bonus for multi-gene hits
+  const distinctGenes = geneGroups.size;
+  const synergyBonus = Math.pow(def.synergyMultiplier, Math.max(0, distinctGenes - 1));
+  rawScore *= synergyBonus;
+
+  // Normalize to 0-100 via sigmoid
+  return Math.round(100 / (1 + Math.exp(-0.3 * (rawScore - 10))));
+}
+
+function findCompoundEffects(variants: MatchedVariant[], def: PathwayDefinition): string[] {
+  const geneSet = new Set(variants.map((v) => v.gene));
+  const effects: string[] = [];
+
+  for (const [pair, description] of Object.entries(def.interactionNotes)) {
+    const [gene1, gene2] = pair.split("+");
+    const has1 = [...geneSet].some((g) => g === gene1 || g.startsWith(gene1) || gene1.startsWith(g));
+    const has2 = [...geneSet].some((g) => g === gene2 || g.startsWith(gene2) || gene2.startsWith(g));
+    if (has1 && has2) {
+      effects.push(description);
+    }
+  }
+
+  return effects;
+}
+
+function fillNarrative(
+  template: string,
+  variants: MatchedVariant[],
+  score: number,
+  riskLevel: string,
+  compoundEffects: string[],
+  involvedGenes: string[]
+): string {
+  const homCount = variants.filter((v) => v.riskAlleleCount === 2).length;
+  const effectsText = compoundEffects.length > 0
+    ? compoundEffects.map((e) => `Notably, ${e.charAt(0).toLowerCase()}${e.slice(1)}`).join(" ") + " "
+    : "";
+
+  return template
+    .replace(/\{\{variantCount\}\}/g, String(variants.length))
+    .replace(/\{\{homCount\}\}/g, String(homCount))
+    .replace(/\{\{geneList\}\}/g, involvedGenes.join(", "))
+    .replace(/\{\{synergyScore\}\}/g, String(score))
+    .replace(/\{\{riskLabel\}\}/g, riskLevel)
+    .replace(/\{\{compoundEffects\}\}/g, effectsText);
+}
 
 export function detectPathways(variants: MatchedVariant[]): PathwayConvergence[] {
   const riskVariants = variants.filter((v) => v.riskAlleleCount !== 0);
 
-  return PATHWAY_DEFINITIONS.map((def) => {
-    const matching = riskVariants.filter((v) => {
-      const condLower = v.condition.toLowerCase();
-      const geneLower = v.gene.toLowerCase();
-      const matchesKeyword = def.keywords.some((k) => condLower.includes(k));
-      const matchesGene = def.genePatterns.some(
-        (p) => v.gene.startsWith(p) || geneLower.includes(p.toLowerCase())
-      );
-      const matchesCategory = def.categories.includes(v.category);
-      return matchesKeyword || matchesGene || matchesCategory;
-    });
-
+  const pathways = PATHWAY_DEFINITIONS.map((def) => {
+    const matching = riskVariants.filter((v) => matchVariantToPathway(v, def));
     if (matching.length === 0) return null;
 
     const homRisk = matching.filter((v) => v.riskAlleleCount === 2).length;
+    const synergyScore = calculatePathwayScore(matching, def);
+    const involvedGenes = [...new Set(matching.map((v) => v.gene))];
+    const compoundEffects = findCompoundEffects(matching, def);
+
     const riskLevel: PathwayConvergence["riskLevel"] =
-      matching.length >= 6 || homRisk >= 2 ? "high" :
-      matching.length >= 3 || homRisk >= 1 ? "elevated" :
-      matching.length >= 2 ? "moderate" : "low";
+      synergyScore >= 75 ? "high" :
+      synergyScore >= 55 ? "elevated" :
+      synergyScore >= 40 ? "moderate" : "low";
+
+    const narrative = fillNarrative(
+      def.narrativeTemplate, matching, synergyScore, riskLevel, compoundEffects, involvedGenes
+    );
 
     return {
       name: def.name,
       slug: def.slug,
       variants: matching,
-      assessment: `${matching.length} risk variant(s) identified, ${homRisk} homozygous.`,
+      assessment: `${matching.length} risk variant(s) identified across ${involvedGenes.length} gene(s), ${homRisk} homozygous.`,
       riskLevel,
-      actions: [], // populated by action generator or report module
+      actions: [],
+      synergyScore,
+      compoundEffects,
+      narrative,
+      involvedGenes,
     } satisfies PathwayConvergence;
   }).filter(Boolean) as PathwayConvergence[];
+
+  // Sort by synergy score descending
+  pathways.sort((a, b) => b.synergyScore - a.synergyScore);
+
+  return pathways;
 }
 
 // ─── Action item generation ─────────────────────────────────────
+
+const RISK_LEVEL_RANK: Record<string, number> = {
+  high: 3, elevated: 2, moderate: 1, low: 0,
+};
 
 export function generateActionItems(
   variants: MatchedVariant[],
@@ -252,45 +296,25 @@ export function generateActionItems(
   // Track which slugs already have pathway-based actions to avoid duplicates with PRS
   const pathwayActionSlugs = new Set<string>();
 
-  // Screening based on pathways
+  // Data-driven actions from pathway definitions
   for (const p of pathways) {
-    if (p.riskLevel === "high" || p.riskLevel === "elevated") {
-      pathwayActionSlugs.add(p.slug);
-      if (p.slug === "cad") {
+    const pathwayDef = PATHWAY_DEFINITIONS.find((d) => d.slug === p.slug);
+    if (!pathwayDef) continue;
+
+    pathwayActionSlugs.add(p.slug);
+    const pRank = RISK_LEVEL_RANK[p.riskLevel] ?? 0;
+    for (const tmpl of pathwayDef.actionTemplates) {
+      const minRank = RISK_LEVEL_RANK[tmpl.minRiskLevel] ?? 0;
+      if (pRank >= minRank) {
         items.push({
-          priority: "urgent",
-          category: "screening",
-          title: "Coronary artery calcium (CAC) score",
-          detail: `${p.variants.length} CAD-related risk variants identified. Comprehensive lipid panel with Lp(a) and apoB also recommended.`,
+          priority: tmpl.priority,
+          category: tmpl.category,
+          title: tmpl.title,
+          detail: tmpl.detail,
           relatedVariants: p.variants.map((v) => v.rsid),
         });
-      }
-      if (p.slug === "af") {
-        items.push({
-          priority: "urgent",
-          category: "screening",
-          title: "Baseline ECG and consider Holter monitoring",
-          detail: `Elevated genetic AF risk. Alert for palpitations, irregular pulse. Moderate alcohol.`,
-          relatedVariants: p.variants.map((v) => v.rsid),
-        });
-      }
-      if (p.slug === "t2d") {
-        items.push({
-          priority: "recommended",
-          category: "screening",
-          title: "Fasting glucose and HbA1c",
-          detail: `${p.variants.length} T2D-related risk variants. Monitor metabolic markers regularly.`,
-          relatedVariants: p.variants.map((v) => v.rsid),
-        });
-      }
-      if (p.slug === "autoimmune") {
-        items.push({
-          priority: "recommended",
-          category: "monitoring",
-          title: "Monitor for autoimmune symptoms",
-          detail: `High autoimmune genetic loading. Anti-CCP/RF if joint symptoms; GI workup if IBD symptoms.`,
-          relatedVariants: p.variants.map((v) => v.rsid),
-        });
+        // Also populate the pathway's actions list
+        p.actions.push(tmpl.title);
       }
     }
   }
@@ -347,7 +371,7 @@ export function generateActionItems(
     });
   }
 
-  // APOE-specific
+  // APOE-specific (not pathway-driven)
   if (apoe.riskLevel === "elevated" || apoe.riskLevel === "high") {
     items.push({
       priority: "urgent",
@@ -383,6 +407,7 @@ export function analyse(
   }
 
   const pathways = detectPathways(variants);
+  const pharmacogenomics = buildDrugGeneMatrix(genome, variants);
 
   // PRS computation (enabled by default)
   let prs: PrsResult | undefined;
@@ -407,6 +432,7 @@ export function analyse(
     variants,
     pathways,
     actionItems,
+    pharmacogenomics,
     prs,
   };
 }
