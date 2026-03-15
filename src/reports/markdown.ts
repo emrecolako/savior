@@ -17,7 +17,7 @@ const SEVERITY_EMOJI: Record<string, string> = {
   informational: "⚪",
 };
 
-function variantTable(variants: MatchedVariant[]): string {
+function variantTable(variants: MatchedVariant[], includeResearch = false): string {
   if (variants.length === 0) return "_None found._\n";
 
   const lines = [
@@ -33,6 +33,13 @@ function variantTable(variants: MatchedVariant[]): string {
     lines.push(
       `| | _${v.condition}_ | | | | | |`
     );
+    if (includeResearch && v.recentFindings && v.recentFindings.length > 0) {
+      for (const f of v.recentFindings.slice(0, 3)) {
+        lines.push(
+          `| | 📄 _Recent: [${f.title}](${f.url}) — ${f.source}, ${f.date}_ | | | | | |`
+        );
+      }
+    }
   }
 
   return lines.join("\n") + "\n";
@@ -145,7 +152,7 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
 
       lines.push(`## ${SEVERITY_EMOJI[sev]} ${labels[sev]}\n`);
       lines.push(`_${svars.length} variant(s) flagged_\n`);
-      lines.push(variantTable(svars));
+      lines.push(variantTable(svars, config.includeRecentLiterature));
     }
   }
 
@@ -181,6 +188,10 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
     lines.push(`## Methodology & Limitations\n`);
     lines.push(`This analysis cross-referenced ${result.totalSnps.toLocaleString()} SNPs against a curated database of clinically significant variants drawn from ClinVar, GWAS Catalog, PharmGKB, CPIC guidelines, and published meta-analyses.\n`);
     lines.push(`**Limitations:** (1) Consumer arrays cover ~640K of ~10M+ common variants. (2) Cannot detect CNVs, structural variants, or repeat expansions. (3) Odds ratios are population-level statistics. (4) HLA typing from tag SNPs is approximate. For clinical-grade analysis, consider whole exome/genome sequencing with a genetic counsellor.\n`);
+
+    if (config.includeRecentLiterature) {
+      lines.push(`Research enrichment via PubMed E-utilities (last 2 years). Research queries use variant rsIDs and gene names only — no genotype data is transmitted.\n`);
+    }
   }
 
   return lines.join("\n");
