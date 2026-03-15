@@ -7,6 +7,12 @@ import { analyse } from "./analysis/engine.js";
 import { generateReport, writeGpCard, writeGpCardJsonFile } from "./reports/index.js";
 import type { ReportFormat, InputFormat, Severity, Category } from "./types.js";
 
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 const program = new Command();
 
 program
@@ -31,7 +37,13 @@ program
   .option("--no-summary", "Omit the plain-English summary section")
   .option("--no-pathways", "Omit pathway convergence analysis")
   .option("--no-actions", "Omit prioritised action list")
-  .action((opts) => {
+  .option("--no-prs", "Skip polygenic risk score computation")
+  .option("--prs-traits <traits...>", "Specific PRS traits to compute (default: all)")
+  .option("--pgs-data <path>", "Path to custom PGS scoring data directory")
+  .option("--research", "Enrich findings with live PubMed research (requires internet)")
+  .option("--research-provider <provider>", "Research provider: pubmed", "pubmed")
+  .option("--max-research <n>", "Max research results per variant", "3")
+  .action(async (opts) => {
     try {
       console.log(`\n🧬 genomic-report v0.1.0\n`);
       console.log(`Parsing: ${opts.input}`);
@@ -48,6 +60,11 @@ program
       console.log(`Analysing...`);
       const result = analyse(genome, db, {
         input: { filePath: opts.input },
+        prs: {
+          enabled: opts.prs !== false,
+          traits: opts.prsTraits as string[] | undefined,
+          scoringDataPath: opts.pgsData as string | undefined,
+        },
         filters: {
           minSeverity: opts.minSeverity as Severity | undefined,
           categories: opts.categories as Category[] | undefined,
@@ -59,7 +76,32 @@ program
       console.log(`  APOE:    ${result.apoe.diplotype}`);
       console.log(`  Pathways: ${result.pathways.length} convergent pathways detected`);
       console.log(`  PGx:     ${result.pharmacogenomics.genes.length} enzymes profiled, ${result.pharmacogenomics.interactions.length} drug interactions evaluated`);
-      console.log(`  Actions: ${result.actionItems.length} action items generated\n`);
+      console.log(`  Actions: ${result.actionItems.length} action items generated`);
+
+      if (result.prs && result.prs.traits.length > 0) {
+        console.log(`\nPolygenic Risk Scores:`);
+        for (const t of result.prs.traits) {
+          const pct = Math.round(t.percentile);
+          const cat = t.riskCategory.toUpperCase().padEnd(13);
+          const coverage = `${t.variantsUsed}/${t.variantsTotal}`;
+          console.log(`  ${t.traitName.padEnd(30)} ${String(pct).padStart(3)}${ordinalSuffix(pct)} percentile (${cat}) [${coverage} variants]`);
+        }
+      }
+      console.log("");
+
+      if (opts.research) {
+        console.log("Researching variants via PubMed...");
+        const { enrichWithResearch } = await import("./research/index.js");
+        await enrichWithResearch(result.variants, {
+          provider: opts.researchProvider as any,
+          apiKey: process.env.PUBMED_API_KEY,
+          maxResultsPerVariant: Number(opts.maxResearch) || 3,
+          minYear: new Date().getFullYear() - 2,
+          enabled: true,
+        });
+        const enriched = result.variants.filter(v => v.recentFindings && v.recentFindings.length > 0);
+        console.log(`  Found research for ${enriched.length} variant(s)\n`);
+      }
 
       console.log(`Generating ${opts.reportFormat} report → ${opts.output}`);
       generateReport(result, {
@@ -69,8 +111,9 @@ program
         includeRawVariants: true,
         includePathways: opts.pathways !== false,
         includeActionItems: opts.actions !== false,
-        includeRecentLiterature: false, // requires research module
+        includeRecentLiterature: !!opts.research,
         includeMethodology: true,
+        includePrs: opts.prs !== false,
         subjectName: opts.name,
       });
 

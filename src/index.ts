@@ -33,8 +33,15 @@ export { loadDatabase, filterDatabase } from "./database/loader.js";
 export { analyse, crossReference, determineApoe, detectPathways, generateActionItems } from "./analysis/engine.js";
 export { buildDrugGeneMatrix } from "./analysis/metabolizers.js";
 
+// PRS
+export { computePrs, computeAllPrs, normalCdf, complementBase, countEffectAlleles, categorizePercentile } from "./analysis/prs-engine.js";
+export { loadPgsIndex, loadPgsScoringFile, loadAllPgsScoringFiles } from "./database/pgs-loader.js";
+
 // Reports
 export { generateReport, writeMarkdownReport, generateMarkdown, writeJsonReport, writeGpCard, writeGpCardJsonFile, generateGpCardMarkdown, generateGpCardJson } from "./reports/index.js";
+
+// Research
+export { enrichWithResearch } from "./research/index.js";
 
 // Types
 export type * from "./types.js";

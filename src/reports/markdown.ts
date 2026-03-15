@@ -1,6 +1,12 @@
 import type { AnalysisResult, MatchedVariant, PathwayConvergence, ReportConfig, DrugInteraction } from "../types.js";
 import { writeFileSync } from "node:fs";
 
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return s[(v - 20) % 10] || s[v] || s[0];
+}
+
 const SEVERITY_EMOJI: Record<string, string> = {
   critical: "🔴",
   high: "🟠",
@@ -18,7 +24,7 @@ const RISK_BADGE: Record<string, string> = {
   low: "🔵 LOW",
 };
 
-function variantTable(variants: MatchedVariant[]): string {
+function variantTable(variants: MatchedVariant[], includeResearch = false): string {
   if (variants.length === 0) return "_None found._\n";
 
   const lines = [
@@ -34,6 +40,13 @@ function variantTable(variants: MatchedVariant[]): string {
     lines.push(
       `| | _${v.condition}_ | | | | | |`
     );
+    if (includeResearch && v.recentFindings && v.recentFindings.length > 0) {
+      for (const f of v.recentFindings.slice(0, 3)) {
+        lines.push(
+          `| | 📄 _Recent: [${f.title}](${f.url}) — ${f.source}, ${f.date}_ | | | | | |`
+        );
+      }
+    }
   }
 
   return lines.join("\n") + "\n";
@@ -82,6 +95,45 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
   // ── APOE ──
   lines.push(`## APOE Genotype\n`);
   lines.push(`**${result.apoe.diplotype}** — ${result.apoe.explanation}\n`);
+
+  // ── Polygenic Risk Scores ──
+  if (config.includePrs && result.prs && result.prs.traits.length > 0) {
+    lines.push(`## Polygenic Risk Scores\n`);
+    lines.push(`Polygenic risk scores aggregate the effects of hundreds to thousands of genetic variants to estimate overall genetic predisposition for complex traits. Scores are normalised against a reference population to produce percentile rankings.\n`);
+
+    // Summary table
+    lines.push(`| Trait | Percentile | Risk | Coverage | PGS ID |`);
+    lines.push(`|-------|-----------|------|----------|--------|`);
+    for (const t of result.prs.traits) {
+      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+      lines.push(`| ${t.traitName} | **${pctStr}** | ${t.riskCategory.toUpperCase()} | ${Math.round(t.coveragePct)}% | ${t.pgsId} |`);
+    }
+    lines.push("");
+
+    // Per-trait detail
+    for (const t of result.prs.traits) {
+      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+      const riskIcon = t.percentile >= 95 ? "🔴" : t.percentile >= 80 ? "🟠" : t.percentile >= 60 ? "🟡" : "🟢";
+      lines.push(`### ${riskIcon} ${t.traitName} — ${pctStr} Percentile (${t.riskCategory.toUpperCase()})\n`);
+      lines.push(`${t.interpretation}\n`);
+      lines.push(`- **Variants scored:** ${t.variantsUsed.toLocaleString()} of ${t.variantsTotal.toLocaleString()} (${Math.round(t.coveragePct)}% coverage)`);
+      lines.push(`- **Raw score:** ${t.rawScore.toFixed(4)} | **Z-score:** ${t.zScore.toFixed(2)}\n`);
+
+      if (t.topContributors.length > 0) {
+        lines.push(`**Top contributing variants:**\n`);
+        lines.push(`| rsID | Gene | Effect Allele | Dosage | Contribution |`);
+        lines.push(`|------|------|---------------|--------|--------------|`);
+        for (const c of t.topContributors) {
+          lines.push(`| ${c.rsid} | ${c.gene ?? "—"} | ${c.effectAllele} | ${c.dosage} | ${c.contribution > 0 ? "+" : ""}${c.contribution.toFixed(4)} |`);
+        }
+        lines.push("");
+      }
+    }
+
+    if (result.prs.limitations.length > 0) {
+      lines.push(`> **PRS Limitations:** ${result.prs.limitations.join(" ")}\n`);
+    }
+  }
 
   // ── Executive Summary ──
   if (config.includeSummary) {
@@ -206,7 +258,7 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
 
       lines.push(`### ${SEVERITY_EMOJI[sev]} ${labels[sev]}\n`);
       lines.push(`_${svars.length} variant(s) flagged_\n`);
-      lines.push(variantTable(svars));
+      lines.push(variantTable(svars, config.includeRecentLiterature));
     }
   }
 
@@ -230,6 +282,10 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
     lines.push(`## Methodology & Limitations\n`);
     lines.push(`This analysis cross-referenced ${result.totalSnps.toLocaleString()} SNPs against a curated database of clinically significant variants drawn from ClinVar, GWAS Catalog, PharmGKB, CPIC guidelines, and published meta-analyses. Variants are clustered into ${result.pathways.length} biological pathways with synergy-aware scoring that accounts for multi-gene interactions, zygosity, and variant severity.\n`);
     lines.push(`**Limitations:** (1) Consumer arrays cover ~640K of ~10M+ common variants. (2) Cannot detect CNVs, structural variants, or repeat expansions. (3) Odds ratios are population-level statistics. (4) HLA typing from tag SNPs is approximate. (5) Pathway synergy scores are heuristic, not validated polygenic risk scores. For clinical-grade analysis, consider whole exome/genome sequencing with a genetic counsellor.\n`);
+
+    if (config.includeRecentLiterature) {
+      lines.push(`Research enrichment via PubMed E-utilities (last 2 years). Research queries use variant rsIDs and gene names only — no genotype data is transmitted.\n`);
+    }
   }
 
   return lines.join("\n");

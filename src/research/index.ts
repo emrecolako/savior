@@ -17,6 +17,22 @@
 
 import type { MatchedVariant, ResearchFinding, ResearchConfig } from "../types.js";
 
+// ─── Helpers ────────────────────────────────────────────────────
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function fetchWithRetry(url: string, retries = 2): Promise<any> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) return res.json();
+    if (attempt < retries) {
+      await sleep(1000 * 2 ** attempt);
+      continue;
+    }
+    throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
+  }
+}
+
 // ─── Provider interface ─────────────────────────────────────────
 
 export interface ResearchProviderImpl {
@@ -44,28 +60,7 @@ export class ExaProvider implements ResearchProviderImpl {
   }
 
   async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
-    // TODO: Implement Exa API integration
-    //
-    // Suggested query strategy:
-    //   1. Search for rsid directly: "rs1799853 CYP2C9 warfarin 2025"
-    //   2. Search for gene + condition: "CYP2C9 warfarin sensitivity pharmacogenomics"
-    //   3. Search for pathway if convergent: "CYP2C9 VKORC1 warfarin dosing algorithm"
-    //
-    // API endpoint: https://api.exa.ai/search
-    //
-    // Example:
-    //   const response = await fetch("https://api.exa.ai/search", {
-    //     method: "POST",
-    //     headers: { "x-api-key": this.apiKey, "Content-Type": "application/json" },
-    //     body: JSON.stringify({
-    //       query: `${variant.rsid} ${variant.gene} ${variant.condition} ${minYear ?? 2024}`,
-    //       numResults: maxResults,
-    //       type: "auto",
-    //       contents: { text: { maxCharacters: 2000 } },
-    //     }),
-    //   });
-
-    console.warn(`[exa] Research module not yet implemented. Skipping ${variant.rsid}.`);
+    console.warn(`[exa] Exa provider not yet implemented. Skipping ${variant.rsid}.`);
     return [];
   }
 }
@@ -81,17 +76,43 @@ export class PubMedProvider implements ResearchProviderImpl {
   }
 
   async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
-    // TODO: Implement PubMed E-utilities integration
-    //
-    // 1. ESearch: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi
-    //    ?db=pubmed&term=${variant.rsid}+AND+${minYear}[dp]&retmax=${maxResults}
-    //
-    // 2. ESummary for each PMID to get title, source, date
-    //
-    // 3. Map to ResearchFinding[]
+    const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 
-    console.warn(`[pubmed] Research module not yet implemented. Skipping ${variant.rsid}.`);
-    return [];
+    // Build query: rsid OR (gene AND condition)
+    let query = `"${variant.rsid}" OR ("${variant.gene}" AND "${variant.condition}")`;
+    if (minYear) {
+      query += ` AND ${minYear}:3000[dp]`;
+    }
+
+    let searchUrl = `${BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${maxResults}&retmode=json`;
+    if (this.apiKey) searchUrl += `&api_key=${this.apiKey}`;
+
+    const searchData = await fetchWithRetry(searchUrl);
+    const pmids: string[] = searchData?.esearchresult?.idlist ?? [];
+    if (pmids.length === 0) return [];
+
+    await sleep(350); // NCBI rate limit: 3 req/s without API key
+
+    let summaryUrl = `${BASE}/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
+    if (this.apiKey) summaryUrl += `&api_key=${this.apiKey}`;
+
+    const summaryData = await fetchWithRetry(summaryUrl);
+    const results: ResearchFinding[] = [];
+
+    for (const pmid of pmids) {
+      const article = summaryData?.result?.[pmid];
+      if (!article) continue;
+      results.push({
+        title: article.title ?? "Untitled",
+        source: article.source ?? "Unknown journal",
+        url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
+        date: article.pubdate ?? "Unknown date",
+        summary: article.title ?? "",
+      });
+    }
+
+    await sleep(350);
+    return results;
   }
 }
 

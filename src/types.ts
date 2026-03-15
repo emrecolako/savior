@@ -226,6 +226,9 @@ export interface AnalysisResult {
   pathways: PathwayConvergence[];
   actionItems: ActionItem[];
   pharmacogenomics: DrugGeneMatrix;
+
+  // Polygenic risk scores (optional)
+  prs?: PrsResult;
 }
 
 export interface ActionItem {
@@ -234,6 +237,73 @@ export interface ActionItem {
   title: string;
   detail: string;
   relatedVariants: string[];       // rsids
+}
+
+// ─── Polygenic risk scores ──────────────────────────────────────
+
+export interface PgsVariantWeight {
+  rsid: string;
+  effectAllele: string;
+  otherAllele: string;
+  effectWeight: number;        // beta from GWAS summary statistics
+  chr: string;
+  pos: number;
+}
+
+export interface PopulationParams {
+  source: string;              // e.g. "UK Biobank"
+  ancestry: string;            // e.g. "EUR", "multi-ancestry"
+  mean: number;                // population mean PRS
+  sd: number;                  // population standard deviation
+  sampleSize: number;
+}
+
+export interface PgsScoringFile {
+  pgsId: string;               // e.g. "PGS000018"
+  traitName: string;           // e.g. "Coronary Artery Disease"
+  traitId: string;             // slug: "cad", "t2d", "autoimmune"
+  publicationPmid?: string;
+  genomeBuild: string;         // "GRCh37" or "GRCh38"
+  totalVariantsOriginal: number;
+  totalVariantsCurated: number;
+  populationParams: PopulationParams;
+  variants: PgsVariantWeight[];
+}
+
+export type PrsRiskCategory = "low" | "average" | "above-average" | "elevated" | "high";
+
+export interface PrsContributor {
+  rsid: string;
+  gene?: string;
+  effectAllele: string;
+  dosage: number;              // 0, 1, or 2
+  contribution: number;        // effectWeight × dosage
+}
+
+export interface PrsTraitResult {
+  traitId: string;
+  traitName: string;
+  pgsId: string;
+  rawScore: number;
+  zScore: number;
+  percentile: number;          // 0–100
+  riskCategory: PrsRiskCategory;
+  variantsUsed: number;
+  variantsTotal: number;
+  coveragePct: number;         // variantsUsed / variantsTotal × 100
+  topContributors: PrsContributor[];
+  interpretation: string;
+}
+
+export interface PrsResult {
+  traits: PrsTraitResult[];
+  limitations: string[];
+}
+
+export interface PrsConfig {
+  enabled: boolean;
+  traits?: string[];           // specific trait IDs, or all if omitted
+  scoringDataPath?: string;    // custom path to PGS scoring data directory
 }
 
 // ─── Report config ──────────────────────────────────────────────
@@ -249,6 +319,7 @@ export interface ReportConfig {
   includeActionItems: boolean;
   includeRecentLiterature: boolean;
   includeMethodology: boolean;
+  includePrs: boolean;
   subjectName?: string;
   language?: string;               // future: i18n
 }
@@ -277,6 +348,7 @@ export interface GenomicReportConfig {
     supplementary?: string[];      // additional database files to merge
   };
   research: ResearchConfig;
+  prs?: PrsConfig;
   report: ReportConfig;
   filters?: {
     minSeverity?: Severity;
