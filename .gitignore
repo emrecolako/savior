@@ -1,0 +1,30 @@
+node_modules/
+dist/
+*.js.map
+.env
+.env.local
+
+# Output files
+*.docx
+report.*
+!src/**/*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# User genome data (NEVER commit)
+*.txt
+!data/*.json
+*.vcf
+*.vcf.gz
+uploads/
