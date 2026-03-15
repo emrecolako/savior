@@ -220,11 +220,22 @@ npx tsx src/cli.ts analyse -i genome.txt --supplementary ./my-db.json
 
 ⚠️ **This tool is for research and educational purposes only.** It is NOT a clinical diagnosis tool.
 
+**Not medical advice.** This software does not provide medical advice, diagnosis, or treatment recommendations. No doctor-patient, genetic-counsellor-client, or other professional relationship is created by using this tool. The output should never be used as a substitute for professional medical judgement.
+
+**No warranty.** This software is provided "as-is" under the MIT License, without warranty of any kind. The authors and contributors are not liable for any damages, health outcomes, or decisions made based on the output of this tool. See [LICENSE](./LICENSE) for full terms.
+
+**No guarantee of accuracy.** The SNP database is community-curated from public sources (ClinVar, GWAS Catalog, PharmGKB, SNPedia, Open Targets). No guarantee is made regarding the accuracy, completeness, or timeliness of variant annotations, odds ratios, or risk classifications. Errors, omissions, and outdated information may be present.
+
+**Not regulatory approved.** This tool has not been evaluated, cleared, or approved by the FDA, EMA, or any other regulatory body. It is not a validated clinical or diagnostic device.
+
+**User responsibility.** You are solely responsible for how you interpret and act on the results. Always consult a qualified healthcare provider or certified genetic counsellor before making any medical decisions based on genetic data.
+
+### Technical limitations
+
 - Consumer genotyping arrays (23andMe, AncestryDNA) cover ~640K of ~10M+ common variants and cannot detect structural variants, CNVs, or repeat expansions
 - Odds ratios are population-level statistics — individual risk depends on environment, lifestyle, and gene-gene interactions
 - HLA typing from tag SNPs is approximate
 - Carrier screening coverage on consumer arrays is limited
-- Always discuss findings with a qualified healthcare provider or genetic counsellor
 
 ## Contributing
 
