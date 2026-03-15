@@ -158,8 +158,8 @@ const PATHWAY_DEFINITIONS = [
     name: "Atrial Fibrillation",
     slug: "af",
     keywords: ["atrial fibrillation"],
-    categories: ["cardiovascular"],
-    genePatterns: ["PITX2", "4q25", "KCNN3", "ZFHX3"],
+    categories: [],  // AF-only: do not broadly match all cardiovascular
+    genePatterns: ["PITX2", "4q25", "KCNN3", "ZFHX3", "SCN2B", "SCN3B", "SCN4B", "MYL4", "HCN4"],
   },
   {
     name: "Type 2 Diabetes / Metabolic Syndrome",
@@ -205,6 +205,23 @@ const PATHWAY_DEFINITIONS = [
   },
 ];
 
+function generatePlainEnglishAssessment(
+  pathwayName: string,
+  matchingCount: number,
+  homRisk: number,
+  riskLevel: PathwayConvergence["riskLevel"]
+): string {
+  const levelText: Record<string, string> = {
+    high: "a higher-than-average",
+    elevated: "a moderately elevated",
+    moderate: "a slightly elevated",
+    low: "a typical",
+  };
+  const qualifier = levelText[riskLevel] ?? "a notable";
+  const homNote = homRisk > 0 ? ` (${homRisk} in both copies of the gene)` : "";
+  return `Your DNA shows ${qualifier} genetic predisposition for ${pathwayName.toLowerCase()}, based on ${matchingCount} relevant variant${matchingCount !== 1 ? "s" : ""}${homNote}.`;
+}
+
 export function detectPathways(variants: MatchedVariant[]): PathwayConvergence[] {
   const riskVariants = variants.filter((v) => v.riskAlleleCount !== 0);
 
@@ -223,16 +240,21 @@ export function detectPathways(variants: MatchedVariant[]): PathwayConvergence[]
     if (matching.length === 0) return null;
 
     const homRisk = matching.filter((v) => v.riskAlleleCount === 2).length;
+    const hetRisk = matching.filter((v) => v.riskAlleleCount === 1).length;
+
+    // Weight: homozygous risk variants count double, heterozygous count once
+    const weightedScore = homRisk * 2 + hetRisk;
+
     const riskLevel: PathwayConvergence["riskLevel"] =
-      matching.length >= 6 || homRisk >= 2 ? "high" :
-      matching.length >= 3 || homRisk >= 1 ? "elevated" :
-      matching.length >= 2 ? "moderate" : "low";
+      weightedScore >= 20 || homRisk >= 8 ? "high" :
+      weightedScore >= 10 || homRisk >= 4 ? "elevated" :
+      weightedScore >= 5 ? "moderate" : "low";
 
     return {
       name: def.name,
       slug: def.slug,
       variants: matching,
-      assessment: `${matching.length} risk variant(s) identified, ${homRisk} homozygous.`,
+      assessment: generatePlainEnglishAssessment(def.name, matching.length, homRisk, riskLevel),
       riskLevel,
       actions: [], // populated by action generator or report module
     } satisfies PathwayConvergence;
@@ -292,7 +314,46 @@ export function generateActionItems(
           relatedVariants: p.variants.map((v) => v.rsid),
         });
       }
+      if (p.slug === "amd") {
+        items.push({
+          priority: "recommended",
+          category: "screening",
+          title: "Comprehensive dilated eye examination",
+          detail: `${p.variants.length} AMD-related risk variants. Annual retinal screening recommended. Consider AREDS2 supplement formula.`,
+          relatedVariants: p.variants.map((v) => v.rsid),
+        });
+      }
+      if (p.slug === "methylation") {
+        items.push({
+          priority: "recommended",
+          category: "supplement",
+          title: "Consider methylfolate supplementation",
+          detail: `MTHFR/methylation pathway variants detected. Check homocysteine levels. Use methylfolate (5-MTHF) instead of folic acid if MTHFR variants are present.`,
+          relatedVariants: p.variants.map((v) => v.rsid),
+        });
+      }
+      if (p.slug === "liver") {
+        items.push({
+          priority: "recommended",
+          category: "monitoring",
+          title: "Liver function monitoring",
+          detail: `Hepatic risk variants detected. Regular liver enzyme panel (ALT, AST, GGT) recommended. Minimize alcohol and monitor for NAFLD.`,
+          relatedVariants: p.variants.map((v) => v.rsid),
+        });
+      }
     }
+  }
+
+  // General lifestyle action when multiple pathways are elevated
+  const elevatedCount = pathways.filter((p) => p.riskLevel === "high" || p.riskLevel === "elevated").length;
+  if (elevatedCount >= 3) {
+    items.push({
+      priority: "recommended",
+      category: "lifestyle",
+      title: "Comprehensive lifestyle risk reduction",
+      detail: `Elevated genetic risk across ${elevatedCount} pathways. Mediterranean diet, regular aerobic exercise (150+ min/week), stress management, and adequate sleep are especially important given your genetic profile.`,
+      relatedVariants: [],
+    });
   }
 
   // PRS-based action items (only if pathway didn't already cover it)
@@ -367,6 +428,51 @@ function ordinalSuffix(n: number): string {
   return s[(v - 20) % 10] || s[v] || s[0];
 }
 
+// ─── Executive summary generation ────────────────────────────────
+
+function generateExecutiveSummary(
+  apoe: ApoeGenotype,
+  pathways: PathwayConvergence[],
+  actionItems: ActionItem[],
+  pharmaVariants: MatchedVariant[],
+  prs?: PrsResult
+): string[] {
+  const bullets: string[] = [];
+
+  // APOE status if notable
+  if (apoe.riskLevel === "elevated" || apoe.riskLevel === "high") {
+    bullets.push(`APOE ${apoe.diplotype}: ${apoe.explanation.split(".")[0]}.`);
+  }
+
+  // Top pathways by risk level
+  const highPathways = pathways.filter((p) => p.riskLevel === "high" || p.riskLevel === "elevated");
+  if (highPathways.length > 0) {
+    const names = highPathways.map((p) => p.name).join(", ");
+    bullets.push(`Elevated genetic risk identified in: ${names}.`);
+  }
+
+  // Pharmacogenomics highlight
+  if (pharmaVariants.length > 0) {
+    bullets.push(`${pharmaVariants.length} pharmacogenomic variant(s) affect drug metabolism — carry this information to all medical appointments.`);
+  }
+
+  // Urgent action count
+  const urgentCount = actionItems.filter((a) => a.priority === "urgent").length;
+  if (urgentCount > 0) {
+    bullets.push(`${urgentCount} urgent action item${urgentCount > 1 ? "s" : ""} requiring clinical follow-up.`);
+  }
+
+  // PRS highlights (only if sufficient data)
+  if (prs) {
+    const highPrs = prs.traits.filter((t) => t.riskCategory !== "insufficient" && t.percentile >= 80);
+    for (const t of highPrs) {
+      bullets.push(`Polygenic risk for ${t.traitName}: ${Math.round(t.percentile)}th percentile.`);
+    }
+  }
+
+  return bullets;
+}
+
 // ─── Main analysis entry point ──────────────────────────────────
 
 export function analyse(
@@ -396,6 +502,11 @@ export function analyse(
 
   const actionItems = generateActionItems(variants, pathways, apoe, prs);
 
+  const pharmaVariants = variants.filter(
+    (v) => v.category === "pharmacogenomics" && v.riskAlleleCount !== 0
+  );
+  const executiveSummary = generateExecutiveSummary(apoe, pathways, actionItems, pharmaVariants, prs);
+
   return {
     inputFile: config?.input?.filePath ?? "unknown",
     inputFormat: genome.format,
@@ -408,5 +519,6 @@ export function analyse(
     pathways,
     actionItems,
     prs,
+    executiveSummary,
   };
 }

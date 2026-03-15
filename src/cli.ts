@@ -80,10 +80,14 @@ program
       if (result.prs && result.prs.traits.length > 0) {
         console.log(`\nPolygenic Risk Scores:`);
         for (const t of result.prs.traits) {
-          const pct = Math.round(t.percentile);
-          const cat = t.riskCategory.toUpperCase().padEnd(13);
           const coverage = `${t.variantsUsed}/${t.variantsTotal}`;
-          console.log(`  ${t.traitName.padEnd(30)} ${String(pct).padStart(3)}${ordinalSuffix(pct)} percentile (${cat}) [${coverage} variants]`);
+          if (t.riskCategory === "insufficient") {
+            console.log(`  ${t.traitName.padEnd(30)}   — insufficient data        [${coverage} variants]`);
+          } else {
+            const pct = Math.round(t.percentile);
+            const cat = t.riskCategory.toUpperCase().padEnd(13);
+            console.log(`  ${t.traitName.padEnd(30)} ${String(pct).padStart(3)}${ordinalSuffix(pct)} percentile (${cat}) [${coverage} variants]`);
+          }
         }
       }
       console.log("");
