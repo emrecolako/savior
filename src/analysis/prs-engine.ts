@@ -94,6 +94,8 @@ function generateInterpretation(
   const abovePct = 100 - pct;
 
   switch (riskCategory) {
+    case "insufficient":
+      return `Insufficient variant coverage to compute a reliable polygenic risk score for ${traitName}. The scoring model requires hundreds of variants but only a small fraction were found in your genotype data. This does not indicate low risk — it means the score cannot be calculated. See the pathway convergence analysis below for a curated-variant assessment of this trait.`;
     case "high":
       return `Your polygenic risk score for ${traitName} places you in the ${ordinal} percentile (high risk). Only approximately ${abovePct}% of the European-ancestry reference population has a higher genetic predisposition. This is a significant finding that should be discussed with your healthcare provider for appropriate screening and prevention strategies.`;
     case "elevated":
@@ -153,8 +155,14 @@ export function computePrs(
   const { mean, sd } = scoringFile.populationParams;
   const zScore = sd > 0 ? (rawScore - mean) / sd : 0;
   const percentile = normalCdf(zScore) * 100;
-  const riskCategory = categorizePercentile(percentile);
   const coveragePct = (variantsUsed / scoringFile.variants.length) * 100;
+
+  // Below 10% coverage, the score is unreliable — missing variants default to 0
+  // contribution which systematically deflates the score
+  const MIN_COVERAGE_PCT = 10;
+  const riskCategory = coveragePct < MIN_COVERAGE_PCT
+    ? "insufficient" as const
+    : categorizePercentile(percentile);
 
   // Build gene lookup from SNP database
   const geneMap = new Map<string, string>();

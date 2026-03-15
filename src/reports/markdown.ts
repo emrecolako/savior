@@ -92,6 +92,15 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
 
   lines.push(`> **Disclaimer:** This report is for research and educational purposes only. It is not a clinical diagnosis. Always discuss findings with a qualified healthcare provider.\n`);
 
+  // ── Key Findings (executive summary) ──
+  if (result.executiveSummary && result.executiveSummary.length > 0) {
+    lines.push(`## Key Findings\n`);
+    for (const bullet of result.executiveSummary) {
+      lines.push(`- ${bullet}`);
+    }
+    lines.push("");
+  }
+
   // ── APOE ──
   lines.push(`## APOE Genotype\n`);
   lines.push(`**${result.apoe.diplotype}** — ${result.apoe.explanation}\n`);
@@ -105,28 +114,43 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
     lines.push(`| Trait | Percentile | Risk | Coverage | PGS ID |`);
     lines.push(`|-------|-----------|------|----------|--------|`);
     for (const t of result.prs.traits) {
-      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
-      lines.push(`| ${t.traitName} | **${pctStr}** | ${t.riskCategory.toUpperCase()} | ${Math.round(t.coveragePct)}% | ${t.pgsId} |`);
+      if (t.riskCategory === "insufficient") {
+        lines.push(`| ${t.traitName} | **—** | INSUFFICIENT DATA | ${Math.round(t.coveragePct)}% | ${t.pgsId} |`);
+      } else {
+        const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+        lines.push(`| ${t.traitName} | **${pctStr}** | ${t.riskCategory.toUpperCase()} | ${Math.round(t.coveragePct)}% | ${t.pgsId} |`);
+      }
     }
     lines.push("");
 
-    // Per-trait detail
-    for (const t of result.prs.traits) {
-      const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
-      const riskIcon = t.percentile >= 95 ? "🔴" : t.percentile >= 80 ? "🟠" : t.percentile >= 60 ? "🟡" : "🟢";
-      lines.push(`### ${riskIcon} ${t.traitName} — ${pctStr} Percentile (${t.riskCategory.toUpperCase()})\n`);
-      lines.push(`${t.interpretation}\n`);
-      lines.push(`- **Variants scored:** ${t.variantsUsed.toLocaleString()} of ${t.variantsTotal.toLocaleString()} (${Math.round(t.coveragePct)}% coverage)`);
-      lines.push(`- **Raw score:** ${t.rawScore.toFixed(4)} | **Z-score:** ${t.zScore.toFixed(2)}\n`);
+    // Check if all traits are insufficient — collapse to compact notice
+    const allInsufficient = result.prs.traits.every((t) => t.riskCategory === "insufficient");
+    if (allInsufficient) {
+      const avgCoverage = Math.round(
+        result.prs.traits.reduce((sum, t) => sum + t.coveragePct, 0) / result.prs.traits.length
+      );
+      lines.push(`> **Note:** Polygenic risk scores could not be computed for any trait due to insufficient variant coverage (~${avgCoverage}% of required variants found in your genotyping data). This is common with consumer genotyping arrays, which test ~640K of the millions of variants used in research-grade PRS models. This does not indicate low risk — it means the scores cannot be reliably calculated. See the summary below for a curated-variant assessment of these traits.\n`);
+    } else {
+      // Per-trait detail only for non-insufficient traits
+      for (const t of result.prs.traits) {
+        if (t.riskCategory === "insufficient") continue;
 
-      if (t.topContributors.length > 0) {
-        lines.push(`**Top contributing variants:**\n`);
-        lines.push(`| rsID | Gene | Effect Allele | Dosage | Contribution |`);
-        lines.push(`|------|------|---------------|--------|--------------|`);
-        for (const c of t.topContributors) {
-          lines.push(`| ${c.rsid} | ${c.gene ?? "—"} | ${c.effectAllele} | ${c.dosage} | ${c.contribution > 0 ? "+" : ""}${c.contribution.toFixed(4)} |`);
+        const pctStr = `${Math.round(t.percentile)}${ordinalSuffix(Math.round(t.percentile))}`;
+        const riskIcon = t.percentile >= 95 ? "🔴" : t.percentile >= 80 ? "🟠" : t.percentile >= 60 ? "🟡" : "🟢";
+        lines.push(`### ${riskIcon} ${t.traitName} — ${pctStr} Percentile (${t.riskCategory.toUpperCase()})\n`);
+        lines.push(`${t.interpretation}\n`);
+        lines.push(`- **Variants scored:** ${t.variantsUsed.toLocaleString()} of ${t.variantsTotal.toLocaleString()} (${Math.round(t.coveragePct)}% coverage)`);
+        lines.push(`- **Raw score:** ${t.rawScore.toFixed(4)} | **Z-score:** ${t.zScore.toFixed(2)}\n`);
+
+        if (t.topContributors.length > 0) {
+          lines.push(`**Top contributing variants:**\n`);
+          lines.push(`| rsID | Gene | Effect Allele | Dosage | Contribution |`);
+          lines.push(`|------|------|---------------|--------|--------------|`);
+          for (const c of t.topContributors) {
+            lines.push(`| ${c.rsid} | ${c.gene ?? "—"} | ${c.effectAllele} | ${c.dosage} | ${c.contribution > 0 ? "+" : ""}${c.contribution.toFixed(4)} |`);
+          }
+          lines.push("");
         }
-        lines.push("");
       }
     }
 
@@ -153,14 +177,18 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
       lines.push("");
     }
 
-    // Pharma summary
+    // Pharma summary — enhanced with table format
     const pharma = result.variants.filter(
       (v) => v.category === "pharmacogenomics" && v.riskAlleleCount !== 0
     );
     if (pharma.length > 0) {
-      lines.push(`### Drug Reactions (Pharmacogenomics)\n`);
+      lines.push(`### 💊 Drug Reactions (Pharmacogenomics)\n`);
+      lines.push(`| Gene | Variant | Drug(s) Affected | Zygosity | Clinical Significance |`);
+      lines.push(`|------|---------|-----------------|----------|----------------------|`);
       for (const v of pharma) {
-        lines.push(`- **${v.gene}** (${v.rsid}): ${v.condition}`);
+        const zyg = v.riskAlleleCount === 2 ? "Homozygous" : "Heterozygous";
+        const significance = v.notes?.split(".")[0] || v.condition;
+        lines.push(`| **${v.gene}** | ${v.rsid} (${v.genotype}) | ${v.condition} | ${zyg} | ${significance} |`);
       }
       lines.push("");
     }
@@ -250,6 +278,9 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
       informational: "Informational — Traits",
     };
 
+    const MAX_UNGROUPED = 15;
+    const DISPLAY_LIMIT_PER_CATEGORY = 10;
+
     for (const sev of severities) {
       const svars = result.variants.filter(
         (v) => v.severity === sev && (v.riskAlleleCount > 0 || v.riskAlleleCount === -1)
@@ -258,7 +289,25 @@ export function generateMarkdown(result: AnalysisResult, config: ReportConfig): 
 
       lines.push(`### ${SEVERITY_EMOJI[sev]} ${labels[sev]}\n`);
       lines.push(`_${svars.length} variant(s) flagged_\n`);
-      lines.push(variantTable(svars, config.includeRecentLiterature));
+
+      if (svars.length <= MAX_UNGROUPED) {
+        lines.push(variantTable(svars, config.includeRecentLiterature));
+      } else {
+        // Group by category for readability
+        const byCategory = new Map<string, MatchedVariant[]>();
+        for (const v of svars) {
+          if (!byCategory.has(v.category)) byCategory.set(v.category, []);
+          byCategory.get(v.category)!.push(v);
+        }
+        for (const [cat, catVars] of byCategory) {
+          lines.push(`#### ${cat.charAt(0).toUpperCase() + cat.slice(1)} (${catVars.length})\n`);
+          const displayVars = catVars.slice(0, DISPLAY_LIMIT_PER_CATEGORY);
+          lines.push(variantTable(displayVars, config.includeRecentLiterature));
+          if (catVars.length > DISPLAY_LIMIT_PER_CATEGORY) {
+            lines.push(`_...and ${catVars.length - DISPLAY_LIMIT_PER_CATEGORY} more ${cat} variant(s)._\n`);
+          }
+        }
+      }
     }
   }
 

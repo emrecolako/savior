@@ -229,6 +229,9 @@ export interface AnalysisResult {
 
   // Polygenic risk scores (optional)
   prs?: PrsResult;
+
+  // Executive summary (3-5 bullet key findings)
+  executiveSummary?: string[];
 }
 
 export interface ActionItem {
@@ -270,7 +273,7 @@ export interface PgsScoringFile {
   variants: PgsVariantWeight[];
 }
 
-export type PrsRiskCategory = "low" | "average" | "above-average" | "elevated" | "high";
+export type PrsRiskCategory = "insufficient" | "low" | "average" | "above-average" | "elevated" | "high";
 
 export interface PrsContributor {
   rsid: string;
