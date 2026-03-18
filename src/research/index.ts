@@ -45,6 +45,41 @@ async function fetchWithRetry(url: string, retries = 2): Promise<any> {
   }
 }
 
+async function fetchText(url: string, retries = 2): Promise<string> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url);
+    if (res.ok) return (res as any).text ? await (res as any).text() : "";
+    if (attempt < retries) {
+      await sleep(1000 * 2 ** attempt);
+      continue;
+    }
+    throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
+  }
+  return "";
+}
+
+/**
+ * Extract abstract text from PubMed XML efetch response.
+ * Falls back to empty string if parsing fails.
+ */
+export function extractAbstractFromXml(xml: string): string {
+  // Simple regex-based XML extraction (avoids DOM parser dependency)
+  const abstractMatch = xml.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/g);
+  if (!abstractMatch) return "";
+
+  return abstractMatch
+    .map((block) => {
+      // Extract label if present (e.g., "BACKGROUND", "METHODS")
+      const labelMatch = block.match(/Label="([^"]+)"/);
+      const textMatch = block.match(/<AbstractText[^>]*>([\s\S]*?)<\/AbstractText>/);
+      const text = textMatch?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+
+      return labelMatch ? `${labelMatch[1]}: ${text}` : text;
+    })
+    .filter((t) => t.length > 0)
+    .join(" ");
+}
+
 // ─── Provider interface ─────────────────────────────────────────
 
 export interface ResearchProviderImpl {
@@ -175,6 +210,41 @@ export class PubMedProvider implements ResearchProviderImpl {
 
       // Stop once we have enough deduplicated results
       if (results.length >= maxResults) break;
+    }
+
+    // Optionally fetch abstracts for top results (richer summaries)
+    if (results.length > 0) {
+      await sleep(350);
+      try {
+        const topPmids = results
+          .map((r) => r.url.match(/\/(\d+)\/$/)?.[1])
+          .filter(Boolean) as string[];
+        let efetchUrl = `${BASE}/efetch.fcgi?db=pubmed&id=${topPmids.join(",")}&retmode=xml`;
+        if (this.apiKey) efetchUrl += `&api_key=${this.apiKey}`;
+
+        const xmlText = await fetchText(efetchUrl);
+        if (xmlText) {
+          // Extract abstracts per PMID
+          const articles = xmlText.split(/<PubmedArticle>/g).slice(1);
+          for (const articleXml of articles) {
+            const pmidMatch = articleXml.match(/<PMID[^>]*>(\d+)<\/PMID>/);
+            if (!pmidMatch) continue;
+
+            const abstract = extractAbstractFromXml(articleXml);
+            if (abstract) {
+              const result = results.find((r) => r.url.includes(`/${pmidMatch![1]}/`));
+              if (result) {
+                // Truncate abstract to ~300 chars for report readability
+                result.summary = abstract.length > 300
+                  ? abstract.slice(0, 297) + "..."
+                  : abstract;
+              }
+            }
+          }
+        }
+      } catch {
+        // Abstract fetch is best-effort — don't fail if it errors
+      }
     }
 
     await sleep(350);

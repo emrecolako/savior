@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance } from "../src/research/index.js";
+import { PubMedProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -295,6 +295,35 @@ describe("enrichWithResearch gene deduplication", () => {
     // Both APOE variants should have findings
     expect(variants[0].recentFindings!.length).toBeGreaterThan(0);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Abstract extraction from XML", () => {
+  it("extracts plain abstract text", () => {
+    const xml = `<AbstractText>This is a study about APOE and Alzheimer's disease.</AbstractText>`;
+    expect(extractAbstractFromXml(xml)).toBe("This is a study about APOE and Alzheimer's disease.");
+  });
+
+  it("handles structured abstracts with labels", () => {
+    const xml = `
+      <AbstractText Label="BACKGROUND">Background info.</AbstractText>
+      <AbstractText Label="METHODS">Study methods.</AbstractText>
+      <AbstractText Label="RESULTS">Key results.</AbstractText>
+    `;
+    const result = extractAbstractFromXml(xml);
+    expect(result).toContain("BACKGROUND: Background info.");
+    expect(result).toContain("METHODS: Study methods.");
+    expect(result).toContain("RESULTS: Key results.");
+  });
+
+  it("strips inline HTML tags from abstract", () => {
+    const xml = `<AbstractText>The <i>APOE</i> gene encodes <b>apolipoprotein E</b>.</AbstractText>`;
+    expect(extractAbstractFromXml(xml)).toBe("The APOE gene encodes apolipoprotein E.");
+  });
+
+  it("returns empty string when no abstract present", () => {
+    const xml = `<Title>Some title</Title>`;
+    expect(extractAbstractFromXml(xml)).toBe("");
   });
 });
 
