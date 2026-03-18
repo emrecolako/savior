@@ -825,6 +825,22 @@ export class FallbackProvider implements ResearchProviderImpl {
   }
 }
 
+// ─── Config helpers ─────────────────────────────────────────────
+
+/**
+ * Create a research config with sensible defaults.
+ * Simplifies the common case of enabling PubMed research.
+ */
+export function createResearchConfig(overrides: Partial<ResearchConfig> = {}): ResearchConfig {
+  return {
+    provider: overrides.provider ?? "pubmed",
+    maxResultsPerVariant: overrides.maxResultsPerVariant ?? 5,
+    minYear: overrides.minYear ?? new Date().getFullYear() - 2,
+    enabled: overrides.enabled ?? true,
+    apiKey: overrides.apiKey,
+  };
+}
+
 // ─── Main enrichment function ───────────────────────────────────
 
 /**

@@ -50,6 +50,7 @@ export {
   annotateEvidenceDirection,
   searchClinicalTrials,
   variantResearchBrief,
+  createResearchConfig,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,

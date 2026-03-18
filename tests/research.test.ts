@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -716,6 +716,29 @@ describe("annotateEvidenceDirection", () => {
     // Should not throw
     annotateEvidenceDirection(variants);
     expect(variants[0].recentFindings).toBeUndefined();
+  });
+});
+
+describe("createResearchConfig", () => {
+  it("creates config with sensible defaults", () => {
+    const config = createResearchConfig();
+    expect(config.provider).toBe("pubmed");
+    expect(config.enabled).toBe(true);
+    expect(config.maxResultsPerVariant).toBe(5);
+    expect(config.minYear).toBe(new Date().getFullYear() - 2);
+  });
+
+  it("allows overrides", () => {
+    const config = createResearchConfig({
+      provider: "exa",
+      apiKey: "my-key",
+      maxResultsPerVariant: 10,
+      enabled: false,
+    });
+    expect(config.provider).toBe("exa");
+    expect(config.apiKey).toBe("my-key");
+    expect(config.maxResultsPerVariant).toBe(10);
+    expect(config.enabled).toBe(false);
   });
 });
 
