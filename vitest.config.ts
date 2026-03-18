@@ -12,5 +12,6 @@ export default defineConfig({
         maxThreads: 8,
       },
     },
+
   },
 });
