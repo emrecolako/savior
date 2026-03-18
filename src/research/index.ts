@@ -15,7 +15,7 @@
  * 3. Update the `ResearchProvider` union type in `types.ts`
  */
 
-import type { MatchedVariant, ResearchFinding, ResearchConfig, EvidenceDirection } from "../types.js";
+import type { MatchedVariant, ResearchFinding, ResearchConfig, EvidenceDirection, SourceType } from "../types.js";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -556,6 +556,63 @@ export function annotateEvidenceDirection(variants: MatchedVariant[]): void {
   }
 }
 
+// ─── Source classification & age warnings ───────────────────────
+
+const PREPRINT_INDICATORS = [
+  "biorxiv", "medrxiv", "arxiv", "preprint", "ssrn",
+  "research square", "authorea", "f1000research",
+];
+
+const PEER_REVIEWED_INDICATORS = [
+  "pubmed.ncbi", "doi.org", "nature.com", "sciencedirect",
+  "wiley.com", "springer.com", "oup.com", "cell.com",
+  "thelancet.com", "bmj.com", "jamanetwork.com", "nejm.org",
+];
+
+/**
+ * Classify whether a finding is from a preprint server or peer-reviewed journal.
+ */
+export function classifySourceType(finding: ResearchFinding): SourceType {
+  const urlLower = finding.url.toLowerCase();
+  const sourceLower = finding.source.toLowerCase();
+  const combined = urlLower + " " + sourceLower;
+
+  if (PREPRINT_INDICATORS.some((p) => combined.includes(p))) return "preprint";
+  if (PEER_REVIEWED_INDICATORS.some((p) => combined.includes(p))) return "peer-reviewed";
+
+  // If it has a PubMed URL, it's likely peer-reviewed
+  if (urlLower.includes("pubmed")) return "peer-reviewed";
+
+  return "unknown";
+}
+
+/**
+ * Check if a finding's publication date is older than a threshold.
+ * @param maxAgeYears - Maximum age in years before marking as outdated (default: 3)
+ */
+export function isOutdated(finding: ResearchFinding, maxAgeYears = 3): boolean {
+  const yearMatch = finding.date.match(/(\d{4})/);
+  if (!yearMatch) return false; // Can't determine — don't flag
+
+  const pubYear = parseInt(yearMatch[1]);
+  const currentYear = new Date().getFullYear();
+  return currentYear - pubYear > maxAgeYears;
+}
+
+/**
+ * Annotate findings with source type and outdated status.
+ * Mutates findings in place.
+ */
+export function annotateSourceMetadata(variants: MatchedVariant[], maxAgeYears = 3): void {
+  for (const v of variants) {
+    if (!v.recentFindings) continue;
+    for (const f of v.recentFindings) {
+      if (!f.sourceType) f.sourceType = classifySourceType(f);
+      if (f.isOutdated === undefined) f.isOutdated = isOutdated(f, maxAgeYears);
+    }
+  }
+}
+
 // ─── Research summary generator ─────────────────────────────────
 
 /**
@@ -1038,8 +1095,9 @@ export async function enrichWithResearch(
     }
   }
 
-  // Annotate all findings with evidence direction
+  // Annotate all findings with evidence direction and source metadata
   annotateEvidenceDirection(variants);
+  annotateSourceMetadata(variants);
 
   return variants;
 }

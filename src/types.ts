@@ -103,6 +103,8 @@ export interface MatchedVariant {
 
 export type EvidenceDirection = "supports-risk" | "protective" | "neutral" | "uncertain";
 
+export type SourceType = "peer-reviewed" | "preprint" | "unknown";
+
 export interface ResearchFinding {
   title: string;
   source: string;                  // journal, preprint server
@@ -111,6 +113,8 @@ export interface ResearchFinding {
   summary: string;
   evidenceDirection?: EvidenceDirection;  // auto-classified direction of evidence
   pmcUrl?: string;                 // PMC full-text URL if available
+  sourceType?: SourceType;         // peer-reviewed vs preprint
+  isOutdated?: boolean;            // true if older than threshold (default 3 years)
 }
 
 export interface ApoeGenotype {

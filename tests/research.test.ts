@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings, classifySourceType, isOutdated, annotateSourceMetadata } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -948,6 +948,67 @@ describe("Research persistence", () => {
   it("returns false when file doesn't exist", () => {
     const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
     expect(loaded).toBe(false);
+  });
+});
+
+describe("Source classification", () => {
+  it("classifies PubMed URLs as peer-reviewed", () => {
+    expect(classifySourceType({
+      title: "T", source: "Nat Genet", url: "https://pubmed.ncbi.nlm.nih.gov/123/", date: "2025", summary: "",
+    })).toBe("peer-reviewed");
+  });
+
+  it("classifies bioRxiv as preprint", () => {
+    expect(classifySourceType({
+      title: "T", source: "bioRxiv", url: "https://www.biorxiv.org/content/123", date: "2025", summary: "",
+    })).toBe("preprint");
+  });
+
+  it("classifies medRxiv as preprint", () => {
+    expect(classifySourceType({
+      title: "T", source: "medRxiv", url: "https://www.medrxiv.org/content/456", date: "2025", summary: "",
+    })).toBe("preprint");
+  });
+
+  it("returns unknown for unrecognized sources", () => {
+    expect(classifySourceType({
+      title: "T", source: "Random Blog", url: "https://example.com/paper", date: "2025", summary: "",
+    })).toBe("unknown");
+  });
+});
+
+describe("Research age detection", () => {
+  it("flags papers older than 3 years as outdated", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2020 Jan", summary: "" })).toBe(true);
+  });
+
+  it("does not flag recent papers", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2025 Mar", summary: "" })).toBe(false);
+  });
+
+  it("uses custom age threshold", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2024 Jan", summary: "" }, 1)).toBe(true);
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2025 Jan", summary: "" }, 1)).toBe(false);
+  });
+
+  it("returns false when date is unparseable", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "Unknown", summary: "" })).toBe(false);
+  });
+});
+
+describe("annotateSourceMetadata", () => {
+  it("annotates findings with source type and outdated status", () => {
+    const variants = [makeVariant({
+      recentFindings: [
+        { title: "New paper", source: "Nature", url: "https://pubmed.ncbi.nlm.nih.gov/1/", date: "2025", summary: "" },
+        { title: "Old preprint", source: "bioRxiv", url: "https://biorxiv.org/1", date: "2020", summary: "" },
+      ],
+    })];
+    annotateSourceMetadata(variants);
+    expect(variants[0].recentFindings![0].sourceType).toBe("peer-reviewed");
+    expect(variants[0].recentFindings![0].isOutdated).toBe(false);
+    expect(variants[0].recentFindings![1].sourceType).toBe("preprint");
+    expect(variants[0].recentFindings![1].isOutdated).toBe(true);
   });
 });
 

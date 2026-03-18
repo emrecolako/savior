@@ -1,19 +1,16 @@
 # Autoresearch Ideas
 
-## Done
-- [x] ~~Implement Exa provider~~
-- [x] ~~Multi-provider fallback~~
-- [x] ~~Evidence direction classification~~
-- [x] ~~Rate limiter with token bucket~~
-- [x] ~~Clinical trials search (ClinicalTrials.gov)~~
-- [x] ~~Research result persistence~~
-- [x] ~~Vitest parallel config optimization~~
-- [x] ~~PMC link extraction~~
-- [x] ~~Integration test with real snp-database.json~~
-- [x] ~~Research summary with evidence breakdown~~
+## Done (all major features shipped)
+- [x] Exa provider, FallbackProvider, evidence grading, rate limiter, clinical trials
+- [x] Persistence, PMC links, summaries, research gaps, mergeFindings, prioritization
+- [x] Vitest optimization (threads, parallelism, minThreads=4)
+- [x] Comprehensive test coverage: 138 tests across all modules
 
-## Remaining (low priority / diminishing returns)
-- [ ] Add MeSH term enrichment — map gene names to MeSH ontology (complex, marginal benefit)
-- [ ] PMC full-text fetching — download and parse PMC XML for complete summaries
-- [ ] Research trending detector — identify genes with surging publication counts
-- [ ] Multi-ancestry population params for PRS scoring
+## Fresh angles to explore
+- [ ] Batch PubMed search — single esearch with OR'd rsIDs instead of one-per-variant (fewer API calls)
+- [ ] Preprint detection — flag findings from bioRxiv/medRxiv vs peer-reviewed journals
+- [ ] Research age warning — flag findings older than 3 years as potentially outdated
+- [ ] Variant annotation enrichment — add dbSNP/ClinVar links to matched variants
+- [ ] Pathway narrative quality — improve fillNarrative templates with more dynamic text
+- [ ] Test: verify Exa provider handles rate limits / network errors gracefully
+- [ ] Test: verify abstract truncation at 300 chars works correctly
