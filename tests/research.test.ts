@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -177,6 +177,54 @@ describe("enrichWithResearch", () => {
     // First variant fails gracefully after all retries, second succeeds
     expect(variants[0].recentFindings).toEqual([]);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("ExaProvider", () => {
+  it("builds semantic query from gene, condition, and rsID", () => {
+    const provider = new ExaProvider("test-key");
+    const query = provider.buildQuery(makeVariant({
+      gene: "APOE",
+      condition: "Alzheimer's disease risk",
+      rsid: "rs429358",
+    }));
+    expect(query).toContain("APOE");
+    expect(query).toContain("Alzheimer's disease risk");
+    expect(query).toContain("rs429358");
+  });
+
+  it("returns empty array when no API key provided", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const provider = new ExaProvider("");
+    const findings = await provider.search(makeVariant(), 3);
+    expect(findings).toEqual([]);
+    warnSpy.mockRestore();
+  });
+
+  it("parses Exa API response into findings", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          results: [
+            {
+              title: "APOE4 Risk Meta-Analysis",
+              url: "https://pubmed.ncbi.nlm.nih.gov/12345/",
+              publishedDate: "2025-03-01T00:00:00.000Z",
+              text: "A comprehensive meta-analysis of APOE e4 allele and Alzheimer's disease risk.",
+            },
+          ],
+        }),
+      })
+    );
+
+    const provider = new ExaProvider("test-key");
+    const findings = await provider.search(makeVariant(), 3, 2024);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toBe("APOE4 Risk Meta-Analysis");
+    expect(findings[0].date).toBe("2025-03-01");
+    expect(findings[0].source).toBe("pubmed.ncbi.nlm.nih.gov");
   });
 });
 

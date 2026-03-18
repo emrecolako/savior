@@ -101,14 +101,88 @@ export interface ResearchProviderImpl {
 export class ExaProvider implements ResearchProviderImpl {
   name = "exa";
   private apiKey: string;
+  private cache = new Map<string, ResearchFinding[]>();
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
+  /**
+   * Build a natural-language search query optimized for Exa's neural search.
+   */
+  buildQuery(variant: MatchedVariant): string {
+    const parts: string[] = [];
+
+    // Gene and condition provide the best semantic signal
+    parts.push(variant.gene);
+    parts.push(variant.condition.replace(/\*\d+\w?\s*—?\s*/g, "").trim());
+
+    // rsID for specificity
+    parts.push(variant.rsid);
+
+    return parts.join(" ");
+  }
+
   async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
-    console.warn(`[exa] Exa provider not yet implemented. Skipping ${variant.rsid}.`);
-    return [];
+    if (!this.apiKey) {
+      console.warn("[exa] No API key provided. Skipping research.");
+      return [];
+    }
+
+    // Check cache
+    const cacheKey = `${variant.rsid}:${maxResults}:${minYear ?? ""}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return [...cached];
+
+    const query = this.buildQuery(variant);
+    const body: Record<string, any> = {
+      query,
+      numResults: maxResults,
+      type: "auto",
+      useAutoprompt: true,
+      category: "research paper",
+    };
+
+    if (minYear) {
+      body.startPublishedDate = `${minYear}-01-01T00:00:00.000Z`;
+    }
+
+    try {
+      const res = await fetch("https://api.exa.ai/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} from Exa`);
+      }
+
+      const data = await (res as any).json();
+      const results: ResearchFinding[] = (data.results ?? []).map((r: any) => ({
+        title: r.title ?? "Untitled",
+        source: r.url ? new URL(r.url).hostname.replace("www.", "") : "Unknown",
+        url: r.url ?? "",
+        date: r.publishedDate?.split("T")[0] ?? "Unknown date",
+        summary: r.text?.slice(0, 300) ?? r.title ?? "",
+      }));
+
+      // Sort by relevance score
+      const sorted = results.sort((a, b) => scoreRelevance(b, variant) - scoreRelevance(a, variant));
+      this.cache.set(cacheKey, sorted);
+      return sorted;
+    } catch (err: any) {
+      console.warn(`[exa] Search failed for ${variant.rsid}: ${err.message}`);
+      return [];
+    }
+  }
+
+  /** Clear the in-memory cache. */
+  clearCache(): void {
+    this.cache.clear();
   }
 }
 
