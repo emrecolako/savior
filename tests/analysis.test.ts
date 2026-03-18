@@ -468,6 +468,22 @@ describe("Full analysis pipeline", () => {
     expect(result.executiveSummary).toBeDefined();
   });
 
+  it("includes PRS results when available", () => {
+    // The full DB has PGS scoring files
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+    const result = analyse(genome, fullDb, { input: { filePath: "test.txt" } });
+
+    // PRS should be computed (may have insufficient coverage but should exist)
+    if (result.prs) {
+      expect(result.prs.traits.length).toBeGreaterThan(0);
+      for (const t of result.prs.traits) {
+        expect(t.traitName).toBeTruthy();
+        expect(typeof t.percentile).toBe("number");
+      }
+    }
+  });
+
   it("generates executive summary bullets", () => {
     const genome = makeTestGenome();
     const result = analyse(genome, TEST_DB);

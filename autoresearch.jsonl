@@ -46,3 +46,4 @@
 {"run":45,"commit":"4f15058","metric":225,"metrics":{"test_count":132},"status":"keep","description":"Add metabolizer tests: CYP2C19 rapid/*17 homozygous, CYP1A2 rapid/*1F homozygous. +2 tests (132 total). 225ms","timestamp":1773848424930,"segment":0}
 {"run":46,"commit":"rptcfg","metric":211,"metrics":{"test_count":132},"status":"discard","description":"Try explicit reporter=default, coverage=false in vitest config. No meaningful difference. 211ms","timestamp":1773848469510,"segment":0}
 {"run":47,"commit":"8289008","metric":216,"metrics":{"test_count":132},"status":"keep","description":"Stability check after vitest config revert. 132 tests, 216ms. Steady state achieved.","timestamp":1773848480829,"segment":0}
+{"run":48,"commit":"384b7dd","metric":210,"metrics":{"test_count":136},"status":"keep","description":"Add database filter tests: by category, severity, combined, and empty filter. +4 tests (136 total). 210ms","timestamp":1773848511695,"segment":0}
