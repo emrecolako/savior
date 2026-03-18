@@ -48,12 +48,15 @@ export {
   extractAbstractFromXml,
   classifyEvidenceDirection,
   annotateEvidenceDirection,
+  searchClinicalTrials,
+  RateLimiter,
   PubMedProvider,
   ExaProvider,
   FallbackProvider,
   setSleep,
   resetSleep,
 } from "./research/index.js";
+export type { ClinicalTrial } from "./research/index.js";
 export type { ResearchProviderImpl } from "./research/index.js";
 
 // Types

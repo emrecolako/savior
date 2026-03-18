@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -447,6 +447,63 @@ describe("Abstract extraction from XML", () => {
   it("returns empty string when no abstract present", () => {
     const xml = `<Title>Some title</Title>`;
     expect(extractAbstractFromXml(xml)).toBe("");
+  });
+});
+
+describe("Clinical trials search", () => {
+  it("parses ClinicalTrials.gov API response", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          studies: [
+            {
+              protocolSection: {
+                identificationModule: {
+                  nctId: "NCT12345678",
+                  briefTitle: "APOE Gene Therapy Trial",
+                },
+                statusModule: { overallStatus: "RECRUITING" },
+                designModule: { phases: ["PHASE3"] },
+                conditionsModule: { conditions: ["Alzheimer Disease"] },
+                armsInterventionsModule: {
+                  interventions: [{ type: "Drug", name: "Lecanemab" }],
+                },
+              },
+            },
+          ],
+        }),
+      })
+    );
+
+    const trials = await searchClinicalTrials("APOE", "Alzheimer's disease", 3);
+    expect(trials).toHaveLength(1);
+    expect(trials[0].nctId).toBe("NCT12345678");
+    expect(trials[0].title).toBe("APOE Gene Therapy Trial");
+    expect(trials[0].status).toBe("RECRUITING");
+    expect(trials[0].phase).toBe("PHASE3");
+    expect(trials[0].conditions).toContain("Alzheimer Disease");
+    expect(trials[0].interventions[0]).toContain("Lecanemab");
+    expect(trials[0].url).toContain("NCT12345678");
+  });
+
+  it("returns empty array on API error", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({ ok: false, status: 500 } as Response)
+    );
+    const trials = await searchClinicalTrials("FAKE", "nothing", 3);
+    expect(trials).toEqual([]);
+  });
+
+  it("handles empty response", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ studies: [] }),
+      })
+    );
+    const trials = await searchClinicalTrials("APOE", "Alzheimer", 3);
+    expect(trials).toEqual([]);
   });
 });
 

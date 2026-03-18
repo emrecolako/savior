@@ -598,6 +598,62 @@ export function generateResearchSummary(variants: MatchedVariant[]): string {
   return lines.join("\n");
 }
 
+// ─── Clinical trials search ─────────────────────────────────────
+
+export interface ClinicalTrial {
+  nctId: string;
+  title: string;
+  status: string;
+  phase: string;
+  conditions: string[];
+  interventions: string[];
+  url: string;
+}
+
+/**
+ * Search ClinicalTrials.gov for active trials related to a gene/condition.
+ * Uses the v2 API (no key required).
+ */
+export async function searchClinicalTrials(
+  gene: string,
+  condition: string,
+  maxResults = 5
+): Promise<ClinicalTrial[]> {
+  const query = `${gene} ${condition.replace(/\*\d+\w?\s*—?\s*/g, "").trim()}`;
+  const url =
+    `https://clinicaltrials.gov/api/v2/studies?query.term=${encodeURIComponent(query)}` +
+    `&filter.overallStatus=RECRUITING,ACTIVE_NOT_RECRUITING` +
+    `&pageSize=${maxResults}&format=json`;
+
+  try {
+    const data = await fetchWithRetry(url, 1, 8000);
+    const studies = data?.studies ?? [];
+
+    return studies.map((s: any) => {
+      const proto = s.protocolSection ?? {};
+      const id = proto.identificationModule ?? {};
+      const status = proto.statusModule ?? {};
+      const design = proto.armsInterventionsModule ?? {};
+      const conditions = proto.conditionsModule?.conditions ?? [];
+      const interventions = (design.interventions ?? []).map(
+        (i: any) => `${i.type ?? ""}: ${i.name ?? ""}`.trim()
+      );
+
+      return {
+        nctId: id.nctId ?? "Unknown",
+        title: id.briefTitle ?? id.officialTitle ?? "Untitled",
+        status: status.overallStatus ?? "Unknown",
+        phase: (proto.designModule?.phases ?? []).join(", ") || "N/A",
+        conditions,
+        interventions,
+        url: `https://clinicaltrials.gov/study/${id.nctId ?? ""}`,
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 // ─── Provider registry ──────────────────────────────────────────
 
 const PROVIDERS: Record<string, new (...args: any[]) => ResearchProviderImpl> = {
