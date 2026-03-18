@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh api:*)",
+      "Bash(git clone:*)",
+      "Bash(cp -r /tmp/savior-clone/* /tmp/savior-clone/.* .)",
+      "Bash(rm -rf /tmp/savior-clone)",
+      "Bash(npm install:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx vitest:*)"
+    ]
+  }
+}

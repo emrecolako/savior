@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, enrichWithResearch } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings, classifySourceType, isOutdated, annotateSourceMetadata, generateVariantLinks } from "../src/research/index.js";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { mkdirSync, unlinkSync } from "node:fs";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -64,9 +67,11 @@ function mockFetch(url: string | URL | Request) {
 beforeEach(() => {
   fetchCalls = [];
   vi.stubGlobal("fetch", mockFetch);
+  setSleep(() => Promise.resolve()); // Skip real delays in tests
 });
 
 afterEach(() => {
+  resetSleep();
   vi.restoreAllMocks();
 });
 
@@ -80,7 +85,7 @@ describe("PubMedProvider", () => {
     const searchUrl = fetchCalls.find((u) => u.includes("esearch.fcgi"));
     expect(searchUrl).toBeDefined();
     expect(searchUrl).toContain("db=pubmed");
-    expect(searchUrl).toContain("retmax=3");
+    expect(searchUrl).toContain("retmax=6"); // fetches 2x for deduplication headroom
     expect(searchUrl).toContain(encodeURIComponent('"rs429358"'));
     expect(searchUrl).toContain(encodeURIComponent("2024:3000[dp]"));
   });
@@ -98,6 +103,73 @@ describe("PubMedProvider", () => {
       summary: "APOE e4 and Alzheimer risk: a 2025 meta-analysis",
     });
     expect(findings[1].source).toBe("Lancet Neurol");
+  });
+
+  it("fetches and populates abstracts from efetch", async () => {
+    const mockXml = `<PubmedArticleSet>
+<PubmedArticle><MedlineCitation><PMID>39000001</PMID><Article><Abstract>
+<AbstractText>This is the abstract for the first paper about APOE.</AbstractText>
+</Abstract></Article></MedlineCitation></PubmedArticle>
+</PubmedArticleSet>`;
+
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      if (urlStr.includes("esummary.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+      }
+      if (urlStr.includes("efetch.fcgi")) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve(mockXml) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 3, 2024);
+    expect(findings.length).toBeGreaterThan(0);
+    // First finding should have abstract populated
+    const first = findings.find((f) => f.url.includes("39000001"));
+    expect(first).toBeDefined();
+    expect(first!.summary).toContain("abstract for the first paper");
+  });
+
+  it("extracts PMC URL when pmcid is available", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ esearchresult: { idlist: ["99001"] } }) });
+      }
+      if (urlStr.includes("esummary.fcgi")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            result: {
+              "99001": {
+                title: "Open access paper",
+                source: "PLoS Genet",
+                pubdate: "2025",
+                articleids: [
+                  { idtype: "pubmed", value: "99001" },
+                  { idtype: "pmc", value: "PMC1234567" },
+                ],
+              },
+            },
+          }),
+        });
+      }
+      // efetch returns empty XML
+      if (urlStr.includes("efetch.fcgi")) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve("") });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 3);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].pmcUrl).toBe("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567/");
   });
 
   it("returns empty array when no PMIDs found", async () => {
@@ -162,8 +234,8 @@ describe("enrichWithResearch", () => {
     });
 
     const variants = [
-      makeVariant({ rsid: "rs-fail", severity: "critical", riskAlleleCount: 1 }),
-      makeVariant({ rsid: "rs-ok", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs-fail", gene: "BRCA1", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs-ok", gene: "BRCA2", severity: "critical", riskAlleleCount: 1 }),
     ];
 
     await enrichWithResearch(variants, {
@@ -175,6 +247,882 @@ describe("enrichWithResearch", () => {
     // First variant fails gracefully after all retries, second succeeds
     expect(variants[0].recentFindings).toEqual([]);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("RateLimiter", () => {
+  it("allows immediate acquisition when tokens are available", async () => {
+    const limiter = new RateLimiter(10);
+    const start = Date.now();
+    await limiter.acquire();
+    await limiter.acquire();
+    await limiter.acquire();
+    // Should be near-instant with sleep mocked
+    expect(Date.now() - start).toBeLessThan(50);
+  });
+
+  it("resets to full capacity", async () => {
+    const limiter = new RateLimiter(2);
+    await limiter.acquire();
+    await limiter.acquire();
+    limiter.reset();
+    // Should have tokens again after reset
+    const start = Date.now();
+    await limiter.acquire();
+    expect(Date.now() - start).toBeLessThan(50);
+  });
+});
+
+describe("ExaProvider", () => {
+  it("builds semantic query from gene, condition, and rsID", () => {
+    const provider = new ExaProvider("test-key");
+    const query = provider.buildQuery(makeVariant({
+      gene: "APOE",
+      condition: "Alzheimer's disease risk",
+      rsid: "rs429358",
+    }));
+    expect(query).toContain("APOE");
+    expect(query).toContain("Alzheimer's disease risk");
+    expect(query).toContain("rs429358");
+  });
+
+  it("returns empty array when no API key provided", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const provider = new ExaProvider("");
+    const findings = await provider.search(makeVariant(), 3);
+    expect(findings).toEqual([]);
+    warnSpy.mockRestore();
+  });
+
+  it("parses Exa API response into findings", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          results: [
+            {
+              title: "APOE4 Risk Meta-Analysis",
+              url: "https://pubmed.ncbi.nlm.nih.gov/12345/",
+              publishedDate: "2025-03-01T00:00:00.000Z",
+              text: "A comprehensive meta-analysis of APOE e4 allele and Alzheimer's disease risk.",
+            },
+          ],
+        }),
+      })
+    );
+
+    const provider = new ExaProvider("test-key");
+    const findings = await provider.search(makeVariant(), 3, 2024);
+
+    expect(findings).toHaveLength(1);
+    expect(findings[0].title).toBe("APOE4 Risk Meta-Analysis");
+    expect(findings[0].date).toBe("2025-03-01");
+    expect(findings[0].source).toBe("pubmed.ncbi.nlm.nih.gov");
+  });
+});
+
+describe("PubMedProvider query building", () => {
+  it("strips star-allele annotations from condition in query", () => {
+    const provider = new PubMedProvider();
+    const variant = makeVariant({
+      gene: "CYP2C9",
+      condition: "CYP2C9*2 — warfarin sensitivity",
+    });
+    const query = provider.buildQuery(variant, 2024);
+    expect(query).toContain('"CYP2C9"[gene]');
+    expect(query).toContain("warfarin sensitivity");
+    expect(query).not.toContain("*2");
+  });
+
+  it("includes MeSH human filter", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant());
+    expect(query).toContain("humans[mesh]");
+  });
+
+  it("uses tiab search for rsID", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant());
+    expect(query).toContain('"rs429358"[tiab]');
+  });
+});
+
+describe("PubMedProvider query edge cases", () => {
+  it("handles condition with special characters", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant({
+      gene: "HLA-DRB1",
+      condition: "Type 1 diabetes / autoimmune (HLA-linked)",
+    }));
+    expect(query).toContain('"HLA-DRB1"[gene]');
+    expect(query).toContain("Type 1 diabetes");
+  });
+
+  it("handles condition with multiple star-allele annotations", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant({
+      gene: "CYP2D6",
+      condition: "CYP2D6*4/*4 — poor metabolizer, CYP2D6*10 — decreased function",
+    }));
+    expect(query).not.toContain("*4");
+    expect(query).not.toContain("*10");
+    expect(query).toContain("poor metabolizer");
+  });
+});
+
+describe("PubMedProvider caching", () => {
+  it("returns cached results on second call for same variant", async () => {
+    let fetchCount = 0;
+    vi.stubGlobal("fetch", (url: string) => {
+      fetchCount++;
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+    });
+
+    const provider = new PubMedProvider();
+    const variant = makeVariant();
+
+    const first = await provider.search(variant, 3, 2024);
+    const fetchCountAfterFirst = fetchCount;
+
+    const second = await provider.search(variant, 3, 2024);
+    // Second call should not make any fetch requests
+    expect(fetchCount).toBe(fetchCountAfterFirst);
+    expect(second).toEqual(first);
+    // Cached copy should be independent (no shared reference)
+    expect(second).not.toBe(first);
+  });
+});
+
+describe("PubMedProvider deduplication", () => {
+  it("deduplicates results with identical normalized titles", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            esearchresult: { idlist: ["1", "2", "3"] },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          result: {
+            "1": { title: "APOE and Alzheimer's Disease", source: "Nature", pubdate: "2025" },
+            "2": { title: "APOE and Alzheimer's Disease", source: "Science", pubdate: "2025" },  // duplicate
+            "3": { title: "Different Paper", source: "Lancet", pubdate: "2025" },
+          },
+        }),
+      });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 5);
+    expect(findings).toHaveLength(2);
+    expect(findings[0].title).toBe("APOE and Alzheimer's Disease");
+    expect(findings[1].title).toBe("Different Paper");
+  });
+});
+
+describe("enrichWithResearch gene deduplication", () => {
+  it("shares findings across variants in the same gene", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", gene: "APOE", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", gene: "APOE", severity: "high", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs3", gene: "BRCA2", severity: "critical", riskAlleleCount: 1 }),
+    ];
+
+    let searchCount = 0;
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        searchCount++;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+    });
+
+    await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      minYear: 2024,
+      enabled: true,
+    });
+
+    // Should only make 2 esearch calls (APOE + BRCA2), not 3
+    expect(searchCount).toBe(2);
+    // Both APOE variants should have findings
+    expect(variants[0].recentFindings!.length).toBeGreaterThan(0);
+    expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("FallbackProvider", () => {
+  it("returns primary results when available", async () => {
+    const primary: any = {
+      name: "primary",
+      search: async () => [{ title: "Primary Paper", source: "J1", url: "", date: "2025", summary: "" }],
+    };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Secondary Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Primary Paper");
+  });
+
+  it("falls back to secondary when primary returns empty", async () => {
+    const primary: any = { name: "primary", search: async () => [] };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Fallback Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Fallback Paper");
+  });
+
+  it("falls back to secondary when primary throws", async () => {
+    const primary: any = { name: "primary", search: async () => { throw new Error("fail"); } };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Rescue Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results[0].title).toBe("Rescue Paper");
+  });
+
+  it("returns empty when both providers fail", async () => {
+    const primary: any = { name: "p", search: async () => { throw new Error("fail"); } };
+    const secondary: any = { name: "s", search: async () => { throw new Error("fail2"); } };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toEqual([]);
+  });
+});
+
+describe("Abstract extraction from XML", () => {
+  it("extracts plain abstract text", () => {
+    const xml = `<AbstractText>This is a study about APOE and Alzheimer's disease.</AbstractText>`;
+    expect(extractAbstractFromXml(xml)).toBe("This is a study about APOE and Alzheimer's disease.");
+  });
+
+  it("handles structured abstracts with labels", () => {
+    const xml = `
+      <AbstractText Label="BACKGROUND">Background info.</AbstractText>
+      <AbstractText Label="METHODS">Study methods.</AbstractText>
+      <AbstractText Label="RESULTS">Key results.</AbstractText>
+    `;
+    const result = extractAbstractFromXml(xml);
+    expect(result).toContain("BACKGROUND: Background info.");
+    expect(result).toContain("METHODS: Study methods.");
+    expect(result).toContain("RESULTS: Key results.");
+  });
+
+  it("strips inline HTML tags from abstract", () => {
+    const xml = `<AbstractText>The <i>APOE</i> gene encodes <b>apolipoprotein E</b>.</AbstractText>`;
+    expect(extractAbstractFromXml(xml)).toBe("The APOE gene encodes apolipoprotein E.");
+  });
+
+  it("returns empty string when no abstract present", () => {
+    const xml = `<Title>Some title</Title>`;
+    expect(extractAbstractFromXml(xml)).toBe("");
+  });
+});
+
+describe("Clinical trials search", () => {
+  it("parses ClinicalTrials.gov API response", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          studies: [
+            {
+              protocolSection: {
+                identificationModule: {
+                  nctId: "NCT12345678",
+                  briefTitle: "APOE Gene Therapy Trial",
+                },
+                statusModule: { overallStatus: "RECRUITING" },
+                designModule: { phases: ["PHASE3"] },
+                conditionsModule: { conditions: ["Alzheimer Disease"] },
+                armsInterventionsModule: {
+                  interventions: [{ type: "Drug", name: "Lecanemab" }],
+                },
+              },
+            },
+          ],
+        }),
+      })
+    );
+
+    const trials = await searchClinicalTrials("APOE", "Alzheimer's disease", 3);
+    expect(trials).toHaveLength(1);
+    expect(trials[0].nctId).toBe("NCT12345678");
+    expect(trials[0].title).toBe("APOE Gene Therapy Trial");
+    expect(trials[0].status).toBe("RECRUITING");
+    expect(trials[0].phase).toBe("PHASE3");
+    expect(trials[0].conditions).toContain("Alzheimer Disease");
+    expect(trials[0].interventions[0]).toContain("Lecanemab");
+    expect(trials[0].url).toContain("NCT12345678");
+  });
+
+  it("returns empty array on API error", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({ ok: false, status: 500 } as Response)
+    );
+    const trials = await searchClinicalTrials("FAKE", "nothing", 3);
+    expect(trials).toEqual([]);
+  });
+
+  it("handles empty response", async () => {
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ studies: [] }),
+      })
+    );
+    const trials = await searchClinicalTrials("APOE", "Alzheimer", 3);
+    expect(trials).toEqual([]);
+  });
+});
+
+describe("Research relevance scoring", () => {
+  it("scores papers mentioning rsID higher", () => {
+    const variant = makeVariant({ rsid: "rs429358", gene: "APOE" });
+    const withRsid = scoreRelevance(
+      { title: "rs429358 in Alzheimer's disease", source: "J Neurol", url: "", date: "2025", summary: "" },
+      variant
+    );
+    const withoutRsid = scoreRelevance(
+      { title: "Genetics of neurodegenerative disease", source: "J Neurol", url: "", date: "2025", summary: "" },
+      variant
+    );
+    expect(withRsid).toBeGreaterThan(withoutRsid);
+  });
+
+  it("scores meta-analyses and high-impact journals higher", () => {
+    const variant = makeVariant();
+    const metaAnalysis = scoreRelevance(
+      { title: "Meta-analysis of APOE", source: "Nature Genetics", url: "", date: "2025", summary: "" },
+      variant
+    );
+    const regularPaper = scoreRelevance(
+      { title: "Study of APOE", source: "Small Journal", url: "", date: "2025", summary: "" },
+      variant
+    );
+    expect(metaAnalysis).toBeGreaterThan(regularPaper);
+  });
+
+  it("gives recency bonus to current year papers", () => {
+    const variant = makeVariant();
+    const recent = scoreRelevance(
+      { title: "APOE study", source: "Nature", url: "", date: "2026 Jan", summary: "" },
+      variant
+    );
+    const older = scoreRelevance(
+      { title: "APOE study", source: "Nature", url: "", date: "2020 Jan", summary: "" },
+      variant
+    );
+    expect(recent).toBeGreaterThan(older);
+  });
+});
+
+describe("Research summary generation", () => {
+  it("generates summary from variants with findings", () => {
+    const variants = [
+      makeVariant({
+        rsid: "rs1", gene: "APOE",
+        recentFindings: [
+          { title: "APOE Paper", source: "Nature", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
+        ],
+      }),
+      makeVariant({
+        rsid: "rs2", gene: "BRCA2",
+        recentFindings: [
+          { title: "BRCA2 Paper", source: "Science", url: "", date: "2025", summary: "", evidenceDirection: "protective" },
+        ],
+      }),
+    ];
+    const summary = generateResearchSummary(variants);
+    expect(summary).toContain("2 relevant papers");
+    expect(summary).toContain("2 variants");
+    expect(summary).toContain("APOE");
+    expect(summary).toContain("BRCA2");
+    expect(summary).toContain("1 supporting risk");
+    expect(summary).toContain("1 protective");
+  });
+
+  it("returns fallback message when no findings", () => {
+    const summary = generateResearchSummary([makeVariant()]);
+    expect(summary).toContain("No recent research findings");
+  });
+
+  it("groups multiple variants in same gene", () => {
+    const variants = [
+      makeVariant({
+        rsid: "rs1", gene: "APOE",
+        recentFindings: [{ title: "Paper 1", source: "J1", url: "", date: "2025", summary: "" }],
+      }),
+      makeVariant({
+        rsid: "rs2", gene: "APOE",
+        recentFindings: [{ title: "Paper 2", source: "J2", url: "", date: "2025", summary: "" }],
+      }),
+    ];
+    const summary = generateResearchSummary(variants);
+    expect(summary).toContain("rs1, rs2");
+    expect(summary).toContain("APOE");
+  });
+});
+
+describe("Evidence direction classification", () => {
+  it("classifies risk-supporting papers", () => {
+    const finding = {
+      title: "rs429358 is associated with increased risk of Alzheimer's disease",
+      source: "Nat Genet", url: "", date: "2025",
+      summary: "This variant is a known risk factor with elevated susceptibility.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("supports-risk");
+  });
+
+  it("classifies protective papers", () => {
+    const finding = {
+      title: "Protective variant reduces risk of cardiovascular disease",
+      source: "Lancet", url: "", date: "2025",
+      summary: "This allele is associated with decreased risk and beneficial outcomes.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("protective");
+  });
+
+  it("classifies neutral/null results", () => {
+    const finding = {
+      title: "No significant association between rs429358 and disease",
+      source: "BMJ", url: "", date: "2025",
+      summary: "Failed to replicate the previously reported association. Null result.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("neutral");
+  });
+
+  it("returns uncertain when no clear signal", () => {
+    const finding = {
+      title: "Genetic architecture of complex traits",
+      source: "Science", url: "", date: "2025",
+      summary: "A broad overview of genomic approaches.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("uncertain");
+  });
+
+  it("handles protective variants correctly", () => {
+    const finding = {
+      title: "This allele provides reduced risk of disease",
+      source: "Nature", url: "", date: "2025",
+      summary: "Protective effect confirmed in large cohort.",
+    };
+    const protectiveVariant = makeVariant({ severity: "protective" as any });
+    expect(classifyEvidenceDirection(finding, protectiveVariant)).toBe("protective");
+  });
+});
+
+describe("annotateEvidenceDirection", () => {
+  it("annotates all findings on variants", () => {
+    const variants = [
+      makeVariant({
+        recentFindings: [
+          { title: "Increased risk of disease", source: "J1", url: "", date: "2025", summary: "risk factor" },
+          { title: "No association found", source: "J2", url: "", date: "2025", summary: "no significant association" },
+        ],
+      }),
+    ];
+    annotateEvidenceDirection(variants);
+    expect(variants[0].recentFindings![0].evidenceDirection).toBe("supports-risk");
+    expect(variants[0].recentFindings![1].evidenceDirection).toBe("neutral");
+  });
+
+  it("skips findings that already have direction", () => {
+    const variants = [
+      makeVariant({
+        recentFindings: [
+          { title: "Some paper", source: "J1", url: "", date: "2025", summary: "increased risk", evidenceDirection: "protective" as any },
+        ],
+      }),
+    ];
+    annotateEvidenceDirection(variants);
+    // Should preserve existing annotation
+    expect(variants[0].recentFindings![0].evidenceDirection).toBe("protective");
+  });
+
+  it("skips variants without findings", () => {
+    const variants = [makeVariant()];
+    // Should not throw
+    annotateEvidenceDirection(variants);
+    expect(variants[0].recentFindings).toBeUndefined();
+  });
+});
+
+describe("prioritizeForResearch", () => {
+  it("sorts by severity (critical > high > moderate)", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "moderate", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs3", severity: "high", riskAlleleCount: 1 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted[0].rsid).toBe("rs2"); // critical
+    expect(sorted[1].rsid).toBe("rs3"); // high
+    expect(sorted[2].rsid).toBe("rs1"); // moderate
+  });
+
+  it("prefers homozygous risk at same severity", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "high", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", severity: "high", riskAlleleCount: 2 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted[0].rsid).toBe("rs2"); // homozygous
+  });
+
+  it("filters out zero-risk variants", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", riskAlleleCount: 0 }),
+      makeVariant({ rsid: "rs2", riskAlleleCount: 1 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted.length).toBe(1);
+    expect(sorted[0].rsid).toBe("rs2");
+  });
+});
+
+describe("createResearchConfig", () => {
+  it("creates config with sensible defaults", () => {
+    const config = createResearchConfig();
+    expect(config.provider).toBe("pubmed");
+    expect(config.enabled).toBe(true);
+    expect(config.maxResultsPerVariant).toBe(5);
+    expect(config.minYear).toBe(new Date().getFullYear() - 2);
+  });
+
+  it("allows overrides", () => {
+    const config = createResearchConfig({
+      provider: "exa",
+      apiKey: "my-key",
+      maxResultsPerVariant: 10,
+      enabled: false,
+    });
+    expect(config.provider).toBe("exa");
+    expect(config.apiKey).toBe("my-key");
+    expect(config.maxResultsPerVariant).toBe(10);
+    expect(config.enabled).toBe(false);
+  });
+});
+
+describe("enrichWithResearch edge cases", () => {
+  it("returns unmodified variants when provider is none", async () => {
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    const result = await enrichWithResearch(variants, {
+      provider: "none",
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(result[0].recentFindings).toBeUndefined();
+  });
+
+  it("returns unmodified variants when disabled", async () => {
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    const result = await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      enabled: false,
+    });
+    expect(result[0].recentFindings).toBeUndefined();
+  });
+
+  it("warns and returns unmodified for unknown provider", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    await enrichWithResearch(variants, {
+      provider: "unknown" as any,
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown research provider"));
+    expect(variants[0].recentFindings).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it("skips moderate-severity variants", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "moderate", riskAlleleCount: 2 }),
+      makeVariant({ rsid: "rs2", severity: "low", riskAlleleCount: 1 }),
+    ];
+    await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(variants[0].recentFindings).toBeUndefined();
+    expect(variants[1].recentFindings).toBeUndefined();
+  });
+});
+
+describe("Variant research brief", () => {
+  it("generates brief with evidence direction and top paper", () => {
+    const variant = makeVariant({
+      rsid: "rs429358", gene: "APOE",
+      recentFindings: [
+        { title: "APOE risk meta-analysis", source: "Nat Genet", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
+        { title: "Another paper", source: "Science", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
+      ],
+    });
+    const brief = variantResearchBrief(variant);
+    expect(brief).toContain("APOE (rs429358)");
+    expect(brief).toContain("2 papers");
+    expect(brief).toContain("risk-supporting");
+    expect(brief).toContain("APOE risk meta-analysis");
+  });
+
+  it("returns fallback for variant without findings", () => {
+    const brief = variantResearchBrief(makeVariant({ rsid: "rs1", gene: "BRCA2" }));
+    expect(brief).toContain("BRCA2 (rs1)");
+    expect(brief).toContain("No recent research");
+  });
+
+  it("notes PMC full text availability", () => {
+    const variant = makeVariant({
+      recentFindings: [{
+        title: "Open Paper", source: "PLoS", url: "", date: "2025", summary: "",
+        evidenceDirection: "protective", pmcUrl: "https://pmc.example.com/123",
+      }],
+    });
+    const brief = variantResearchBrief(variant);
+    expect(brief).toContain("full text available");
+    expect(brief).toContain("protective");
+  });
+});
+
+describe("Research persistence", () => {
+  const TMP = join(tmpdir(), "genomic-report-research-test");
+  try { mkdirSync(TMP, { recursive: true }); } catch {}
+
+  it("saves and loads research findings", () => {
+    const filePath = join(TMP, "test-findings.json");
+    const variants = [
+      makeVariant({
+        rsid: "rs1",
+        gene: "APOE",
+        recentFindings: [
+          { title: "Paper 1", source: "Nature", url: "https://example.com/1", date: "2025", summary: "Summary 1", evidenceDirection: "supports-risk" },
+        ],
+      }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2" }), // no findings
+    ];
+
+    saveResearchFindings(variants, filePath);
+
+    // Load into fresh variants
+    const freshVariants = [
+      makeVariant({ rsid: "rs1", gene: "APOE" }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2" }),
+    ];
+    const loaded = loadResearchFindings(freshVariants, filePath);
+    expect(loaded).toBe(true);
+    expect(freshVariants[0].recentFindings).toHaveLength(1);
+    expect(freshVariants[0].recentFindings![0].title).toBe("Paper 1");
+    expect(freshVariants[1].recentFindings).toBeUndefined();
+
+    try { unlinkSync(filePath); } catch {}
+  });
+
+  it("returns false when file doesn't exist", () => {
+    const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
+    expect(loaded).toBe(false);
+  });
+});
+
+describe("Source classification", () => {
+  it("classifies PubMed URLs as peer-reviewed", () => {
+    expect(classifySourceType({
+      title: "T", source: "Nat Genet", url: "https://pubmed.ncbi.nlm.nih.gov/123/", date: "2025", summary: "",
+    })).toBe("peer-reviewed");
+  });
+
+  it("classifies bioRxiv as preprint", () => {
+    expect(classifySourceType({
+      title: "T", source: "bioRxiv", url: "https://www.biorxiv.org/content/123", date: "2025", summary: "",
+    })).toBe("preprint");
+  });
+
+  it("classifies medRxiv as preprint", () => {
+    expect(classifySourceType({
+      title: "T", source: "medRxiv", url: "https://www.medrxiv.org/content/456", date: "2025", summary: "",
+    })).toBe("preprint");
+  });
+
+  it("returns unknown for unrecognized sources", () => {
+    expect(classifySourceType({
+      title: "T", source: "Random Blog", url: "https://example.com/paper", date: "2025", summary: "",
+    })).toBe("unknown");
+  });
+});
+
+describe("Research age detection", () => {
+  it("flags papers older than 3 years as outdated", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2020 Jan", summary: "" })).toBe(true);
+  });
+
+  it("does not flag recent papers", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2025 Mar", summary: "" })).toBe(false);
+  });
+
+  it("uses custom age threshold", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2024 Jan", summary: "" }, 1)).toBe(true);
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "2025 Jan", summary: "" }, 1)).toBe(false);
+  });
+
+  it("returns false when date is unparseable", () => {
+    expect(isOutdated({ title: "T", source: "J", url: "", date: "Unknown", summary: "" })).toBe(false);
+  });
+});
+
+describe("Variant link generation", () => {
+  it("generates all database links for an rsID", () => {
+    const links = generateVariantLinks("rs429358");
+    expect(links.dbSnp).toBe("https://www.ncbi.nlm.nih.gov/snp/rs429358");
+    expect(links.clinVar).toContain("rs429358");
+    expect(links.gnomAd).toContain("rs429358");
+    expect(links.ensembl).toContain("rs429358");
+    expect(links.openTargets).toContain("rs429358");
+  });
+});
+
+describe("annotateSourceMetadata", () => {
+  it("annotates findings with source type and outdated status", () => {
+    const variants = [makeVariant({
+      recentFindings: [
+        { title: "New paper", source: "Nature", url: "https://pubmed.ncbi.nlm.nih.gov/1/", date: "2025", summary: "" },
+        { title: "Old preprint", source: "bioRxiv", url: "https://biorxiv.org/1", date: "2020", summary: "" },
+      ],
+    })];
+    annotateSourceMetadata(variants);
+    expect(variants[0].recentFindings![0].sourceType).toBe("peer-reviewed");
+    expect(variants[0].recentFindings![0].isOutdated).toBe(false);
+    expect(variants[0].recentFindings![1].sourceType).toBe("preprint");
+    expect(variants[0].recentFindings![1].isOutdated).toBe(true);
+  });
+});
+
+describe("mergeFindings", () => {
+  it("deduplicates by normalized title", () => {
+    const a = [
+      { title: "APOE Study", source: "Nature", url: "u1", date: "2025", summary: "Short" },
+    ];
+    const b = [
+      { title: "APOE Study", source: "Science", url: "u2", date: "2025", summary: "A much longer and more detailed summary" },
+      { title: "Different Paper", source: "Lancet", url: "u3", date: "2025", summary: "Another" },
+    ];
+    const merged = mergeFindings(a, b);
+    expect(merged.length).toBe(2);
+    // Should keep the version with the longer summary
+    const apoe = merged.find((f) => f.title === "APOE Study")!;
+    expect(apoe.summary).toContain("much longer");
+  });
+
+  it("preserves PMC URL from either source", () => {
+    const a = [{ title: "Paper", source: "J", url: "u1", date: "2025", summary: "Short" }];
+    const b = [{ title: "Paper", source: "J", url: "u2", date: "2025", summary: "Short", pmcUrl: "https://pmc/1" }];
+    const merged = mergeFindings(a, b);
+    expect(merged[0].pmcUrl).toBe("https://pmc/1");
+  });
+});
+
+describe("findResearchGaps", () => {
+  it("identifies high-priority variants without research", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1, recentFindings: [] }),
+      makeVariant({ rsid: "rs2", severity: "critical", riskAlleleCount: 1, recentFindings: [
+        { title: "P", source: "J", url: "", date: "2025", summary: "" },
+      ]}),
+      makeVariant({ rsid: "rs3", severity: "high", riskAlleleCount: 2 }), // no findings
+      makeVariant({ rsid: "rs4", severity: "moderate", riskAlleleCount: 1 }), // not high priority
+    ];
+    const gaps = findResearchGaps(variants);
+    expect(gaps.length).toBe(2); // rs1 (empty findings) and rs3 (undefined)
+    expect(gaps.map((v) => v.rsid).sort()).toEqual(["rs1", "rs3"]);
+  });
+});
+
+describe("Research landscape overview", () => {
+  it("generates overview with papers and trials", () => {
+    const variants = [
+      makeVariant({
+        gene: "APOE", recentFindings: [
+          { title: "P1", source: "J1", url: "", date: "2025", summary: "" },
+          { title: "P2", source: "J2", url: "", date: "2025", summary: "", pmcUrl: "https://pmc/1" },
+        ],
+      }),
+    ];
+    const trials = [
+      { nctId: "NCT1", title: "Trial", status: "RECRUITING", phase: "PHASE3", conditions: [], interventions: [], url: "" },
+    ];
+    const overview = researchLandscapeOverview(variants, trials);
+    expect(overview).toContain("2 relevant publications");
+    expect(overview).toContain("APOE");
+    expect(overview).toContain("1 paper available as open-access");
+    expect(overview).toContain("1 active clinical trial");
+    expect(overview).toContain("1 currently recruiting");
+  });
+
+  it("returns fallback when no enrichment", () => {
+    const overview = researchLandscapeOverview([makeVariant()]);
+    expect(overview).toContain("No research enrichment");
+  });
+});
+
+describe("Full research pipeline", () => {
+  it("enriches, annotates, summarizes, and generates briefs in sequence", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", gene: "APOE", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2", severity: "high", riskAlleleCount: 2 }),
+      makeVariant({ rsid: "rs3", gene: "TP53", severity: "moderate", riskAlleleCount: 1 }),
+    ];
+
+    // Step 1: Enrich with research
+    const enriched = await enrichWithResearch(variants, createResearchConfig({ provider: "pubmed" }));
+
+    // Step 2: Should have findings on critical/high variants only
+    expect(enriched[0].recentFindings).toBeDefined();
+    expect(enriched[1].recentFindings).toBeDefined();
+    expect(enriched[2].recentFindings).toBeUndefined(); // moderate
+
+    // Step 3: Evidence direction should be auto-annotated
+    for (const v of enriched.filter((v) => v.recentFindings?.length)) {
+      for (const f of v.recentFindings!) {
+        expect(f.evidenceDirection).toBeDefined();
+      }
+    }
+
+    // Step 4: Generate summary
+    const summary = generateResearchSummary(enriched);
+    expect(summary).toContain("APOE");
+    expect(summary).toContain("BRCA2");
+
+    // Step 5: Generate briefs
+    const brief1 = variantResearchBrief(enriched[0]);
+    expect(brief1).toContain("APOE");
+    const brief3 = variantResearchBrief(enriched[2]);
+    expect(brief3).toContain("No recent research");
   });
 });
 

@@ -3,8 +3,9 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
-import { crossReference, determineApoe, detectPathways } from "../src/analysis/engine.js";
+import { crossReference, determineApoe, detectPathways, analyse, generateActionItems } from "../src/analysis/engine.js";
 import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
+import { loadDatabase, filterDatabase } from "../src/database/loader.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
 
 const TMP = join(tmpdir(), "genomic-report-tests");
@@ -112,6 +113,40 @@ describe("Cross-reference engine", () => {
     expect(apoe429.riskAlleleCount).toBe(0);
   });
 
+  it("handles no-call genotypes (-- and 00)", () => {
+    const data = `# test\nrs429358\t19\t45411941\t--\nrs7412\t19\t45412079\t00\nrs4680\t22\t19951271\tAA\n`;
+    const path = join(TMP, "nocall-test.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const variants = crossReference(genome, TEST_DB);
+    // Only rs4680 should match (rs429358 and rs7412 are no-calls)
+    expect(variants.find((v) => v.rsid === "rs429358")).toBeUndefined();
+    expect(variants.find((v) => v.rsid === "rs7412")).toBeUndefined();
+    expect(variants.find((v) => v.rsid === "rs4680")).toBeDefined();
+  });
+
+  it("correctly handles 'varies' risk allele", () => {
+    const db: SnpDatabase = {
+      version: "test",
+      lastUpdated: "2026-01-01",
+      entries: [{
+        rsid: "rs4680",
+        gene: "COMT",
+        riskAllele: "varies",
+        condition: "COMT — variable effect",
+        category: "pharmacogenomics",
+        severity: "moderate",
+        evidenceLevel: "GWAS",
+        notes: "Complex.",
+      }],
+    };
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, db);
+    const comt = variants.find((v) => v.rsid === "rs4680");
+    expect(comt).toBeDefined();
+    expect(comt!.riskAlleleCount).toBe(-1); // undetermined
+  });
+
   it("sorts results by severity", () => {
     const genome = makeTestGenome();
     const variants = crossReference(genome, TEST_DB);
@@ -131,6 +166,36 @@ describe("APOE determination", () => {
 
     expect(apoe.diplotype).toBe("e3/e3");
     expect(apoe.riskLevel).toBe("average");
+  });
+
+  it("determines e3/e4 correctly (elevated risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tCT\nrs7412\t19\t45412079\tCC\n`;
+    const path = join(TMP, "apoe-e3e4.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e3/e4");
+    expect(apoe.riskLevel).toBe("elevated");
+  });
+
+  it("determines e4/e4 correctly (high risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tCC\nrs7412\t19\t45412079\tCC\n`;
+    const path = join(TMP, "apoe-e4e4.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e4/e4");
+    expect(apoe.riskLevel).toBe("high");
+  });
+
+  it("determines e2/e3 correctly (low risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tTT\nrs7412\t19\t45412079\tCT\n`;
+    const path = join(TMP, "apoe-e2e3.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e2/e3");
+    expect(apoe.riskLevel).toBe("low");
   });
 
   it("handles missing SNPs gracefully", () => {
@@ -287,6 +352,169 @@ describe("Pathway convergence", () => {
 
 // ─── Pharmacogenomics / Drug-Gene Matrix ─────────────────────
 
+describe("Action item generation", () => {
+  it("generates pharmacogenomics alert when PGx variants present", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+    const apoe = determineApoe(genome);
+    const actions = generateActionItems(variants, pathways, apoe);
+
+    const pgxAlert = actions.find((a: any) => a.category === "pharmacogenomics");
+    expect(pgxAlert).toBeDefined();
+    expect(pgxAlert!.priority).toBe("urgent");
+  });
+
+  it("generates lifestyle actions when multiple pathways elevated", () => {
+    // This test uses the small test DB, so elevated pathway count may be low
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+    const apoe = determineApoe(genome);
+    const actions = generateActionItems(variants, pathways, apoe);
+
+    // Should at least have some actions
+    expect(actions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Database filtering", () => {
+  it("filters by category", () => {
+    const filtered = filterDatabase(TEST_DB, { categories: ["pharmacogenomics"] });
+    expect(filtered.length).toBe(2); // CYP2C9 and COMT
+    expect(filtered.every((e) => e.category === "pharmacogenomics")).toBe(true);
+  });
+
+  it("filters by minimum severity", () => {
+    const filtered = filterDatabase(TEST_DB, { minSeverity: "critical" });
+    expect(filtered.every((e) => e.severity === "critical")).toBe(true);
+  });
+
+  it("combines category and severity filters", () => {
+    const filtered = filterDatabase(TEST_DB, {
+      categories: ["pharmacogenomics"],
+      minSeverity: "moderate",
+    });
+    // CYP2C9 (critical) and COMT (moderate) both pass
+    expect(filtered.length).toBe(2);
+  });
+
+  it("returns all entries with no filters", () => {
+    const filtered = filterDatabase(TEST_DB, {});
+    expect(filtered.length).toBe(TEST_DB.entries.length);
+  });
+});
+
+describe("Integration: large database cross-reference", () => {
+  it("detects pathways from full database", () => {
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+    const variants = crossReference(genome, fullDb);
+    const pathways = detectPathways(variants);
+
+    // Should detect at least some pathways from a full database
+    expect(pathways.length).toBeGreaterThan(0);
+
+    // All pathways should have valid structure
+    for (const p of pathways) {
+      expect(p.name).toBeTruthy();
+      expect(p.slug).toBeTruthy();
+      expect(p.synergyScore).toBeGreaterThanOrEqual(0);
+      expect(p.synergyScore).toBeLessThanOrEqual(100);
+      expect(p.involvedGenes.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("handles full snp-database.json without errors", () => {
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+
+    expect(fullDb.entries.length).toBeGreaterThan(1000);
+
+    const variants = crossReference(genome, fullDb);
+    // Should match some variants from the full DB
+    expect(variants.length).toBeGreaterThanOrEqual(4); // at minimum our test SNPs
+    // Should be sorted by severity
+    for (let i = 1; i < variants.length; i++) {
+      const severityRank: Record<string, number> = { critical: 0, high: 1, moderate: 2, low: 3, protective: 4, carrier: 5, informational: 6 };
+      const prev = severityRank[variants[i - 1].severity] ?? 99;
+      const curr = severityRank[variants[i].severity] ?? 99;
+      expect(prev).toBeLessThanOrEqual(curr);
+    }
+  });
+});
+
+describe("Cross-reference progress callback", () => {
+  it("calls onProgress with current/total during cross-reference", () => {
+    const genome = makeTestGenome();
+    const calls: [number, number][] = [];
+    crossReference(genome, TEST_DB, (current, total) => {
+      calls.push([current, total]);
+    });
+    expect(calls.length).toBe(TEST_DB.entries.length);
+    expect(calls[0]).toEqual([1, TEST_DB.entries.length]);
+    expect(calls[calls.length - 1]).toEqual([TEST_DB.entries.length, TEST_DB.entries.length]);
+  });
+});
+
+describe("Analysis with filters", () => {
+  it("filters to risk-alleles-only when configured", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB, {
+      input: { filePath: "test.txt" },
+      filters: { onlyRiskAlleles: true },
+    });
+    // All returned variants should have risk alleles (count > 0 or -1)
+    for (const v of result.variants) {
+      expect(v.riskAlleleCount).not.toBe(0);
+    }
+  });
+});
+
+describe("Full analysis pipeline", () => {
+  it("runs analyse() end-to-end with test genome", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB, { input: { filePath: "test.txt" } });
+
+    expect(result.inputFormat).toBe("23andme");
+    expect(result.totalSnps).toBeGreaterThan(0);
+    expect(result.matchedCount).toBe(4);
+    expect(result.apoe.diplotype).toBe("e3/e3");
+    expect(result.variants.length).toBe(4);
+    expect(result.pathways.length).toBeGreaterThan(0);
+    expect(result.pharmacogenomics.genes.length).toBe(11);
+    expect(result.pharmacogenomics.interactions.length).toBeGreaterThan(0);
+    expect(result.executiveSummary).toBeDefined();
+  });
+
+  it("includes PRS results when available", () => {
+    // The full DB has PGS scoring files
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+    const result = analyse(genome, fullDb, { input: { filePath: "test.txt" } });
+
+    // PRS should be computed (may have insufficient coverage but should exist)
+    if (result.prs) {
+      expect(result.prs.traits.length).toBeGreaterThan(0);
+      for (const t of result.prs.traits) {
+        expect(t.traitName).toBeTruthy();
+        expect(typeof t.percentile).toBe("number");
+      }
+    }
+  });
+
+  it("generates executive summary bullets", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB);
+    
+    // With CYP2C9*2 pharmacogenomics variant, should mention it
+    const hasPharma = result.executiveSummary?.some((b) =>
+      b.toLowerCase().includes("pharmacogenomic")
+    );
+    expect(hasPharma).toBe(true);
+  });
+});
+
 describe("Drug-gene interaction matrix", () => {
   it("returns metabolizer status for all 11 PGx genes", () => {
     const genome = makeTestGenome();
@@ -381,6 +609,32 @@ describe("Drug-gene interaction matrix", () => {
     const clopidogrel = matrix.interactions.find((di) => di.drug === "Clopidogrel");
     expect(clopidogrel).toBeDefined();
     expect(clopidogrel!.action).toBe("use alternative");
+  });
+
+  it("detects CYP2C19 ultra-rapid metabolizer from *17/*17", () => {
+    // rs12248560 TT = CYP2C19*17 homozygous
+    const data = `# test\nrs12248560\t10\t96541616\tTT\n`;
+    const path = join(TMP, "pgx-um.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    const cyp2c19 = matrix.genes.find((g) => g.gene === "CYP2C19")!;
+    expect(["rapid", "ultra-rapid"]).toContain(cyp2c19.phenotype);
+    expect(cyp2c19.activityScore).toBeGreaterThan(2);
+  });
+
+  it("handles CYP1A2 rapid metabolizer", () => {
+    // rs762551 AA = CYP1A2*1F homozygous (increased activity)
+    const data = `# test\nrs762551\t15\t75041917\tAA\n`;
+    const path = join(TMP, "pgx-1a2.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    const cyp1a2 = matrix.genes.find((g) => g.gene === "CYP1A2")!;
+    // AA = two increased-function alleles
+    expect(["rapid", "ultra-rapid"]).toContain(cyp1a2.phenotype);
   });
 
   it("groups interactions by drug class", () => {

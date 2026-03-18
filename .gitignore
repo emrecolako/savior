@@ -28,3 +28,4 @@ coverage/
 *.vcf
 *.vcf.gz
 uploads/
+.tsc-stamp
