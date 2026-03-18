@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -343,6 +343,58 @@ describe("enrichWithResearch gene deduplication", () => {
     // Both APOE variants should have findings
     expect(variants[0].recentFindings!.length).toBeGreaterThan(0);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("FallbackProvider", () => {
+  it("returns primary results when available", async () => {
+    const primary: any = {
+      name: "primary",
+      search: async () => [{ title: "Primary Paper", source: "J1", url: "", date: "2025", summary: "" }],
+    };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Secondary Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Primary Paper");
+  });
+
+  it("falls back to secondary when primary returns empty", async () => {
+    const primary: any = { name: "primary", search: async () => [] };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Fallback Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe("Fallback Paper");
+  });
+
+  it("falls back to secondary when primary throws", async () => {
+    const primary: any = { name: "primary", search: async () => { throw new Error("fail"); } };
+    const secondary: any = {
+      name: "secondary",
+      search: async () => [{ title: "Rescue Paper", source: "J2", url: "", date: "2025", summary: "" }],
+    };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results[0].title).toBe("Rescue Paper");
+  });
+
+  it("returns empty when both providers fail", async () => {
+    const primary: any = { name: "p", search: async () => { throw new Error("fail"); } };
+    const secondary: any = { name: "s", search: async () => { throw new Error("fail2"); } };
+
+    const provider = new FallbackProvider(primary, secondary);
+    const results = await provider.search(makeVariant(), 3);
+    expect(results).toEqual([]);
   });
 });
 

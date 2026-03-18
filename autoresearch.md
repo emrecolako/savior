@@ -47,6 +47,10 @@ Optimize the genomic-report research module and overall test suite for speed and
 8. **In-memory result caching** — PubMedProvider caches by variant+params, returns copies to prevent mutation
 9. **Abstract fetching** — PubMed efetch API for rich summaries, XML parser with structured label support, HTML stripping
 
+10. **Exa provider implementation** — Full neural search provider with query builder, caching, error handling (no longer a stub)
+11. **Research summary generator** — Generates cohesive narrative from findings, grouped by gene
+12. **Library exports** — All new functions properly exported from index.ts
+
 ### Current State
-- 71 tests, 339ms (95.5% faster than baseline)
-- Research module: better queries, dedup, caching, abstract fetching, relevance scoring
+- 81 tests, ~370ms (95% faster than baseline of 7540ms)
+- Research module: PubMed + Exa providers, better queries, dedup, caching, abstract fetching, relevance scoring, summary generation

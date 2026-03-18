@@ -432,6 +432,39 @@ const PROVIDERS: Record<string, new (...args: any[]) => ResearchProviderImpl> = 
   pubmed: PubMedProvider,
 };
 
+// ─── Multi-provider with fallback ───────────────────────────────
+
+/**
+ * A composite provider that tries the primary provider first,
+ * then falls back to a secondary if no results are found.
+ */
+export class FallbackProvider implements ResearchProviderImpl {
+  name = "fallback";
+  private primary: ResearchProviderImpl;
+  private secondary: ResearchProviderImpl;
+
+  constructor(primary: ResearchProviderImpl, secondary: ResearchProviderImpl) {
+    this.primary = primary;
+    this.secondary = secondary;
+    this.name = `${primary.name}+${secondary.name}`;
+  }
+
+  async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
+    try {
+      const results = await this.primary.search(variant, maxResults, minYear);
+      if (results.length > 0) return results;
+    } catch {
+      // Primary failed — try secondary
+    }
+
+    try {
+      return await this.secondary.search(variant, maxResults, minYear);
+    } catch {
+      return [];
+    }
+  }
+}
+
 // ─── Main enrichment function ───────────────────────────────────
 
 /**
