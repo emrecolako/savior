@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -716,6 +716,39 @@ describe("annotateEvidenceDirection", () => {
     // Should not throw
     annotateEvidenceDirection(variants);
     expect(variants[0].recentFindings).toBeUndefined();
+  });
+});
+
+describe("prioritizeForResearch", () => {
+  it("sorts by severity (critical > high > moderate)", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "moderate", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs3", severity: "high", riskAlleleCount: 1 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted[0].rsid).toBe("rs2"); // critical
+    expect(sorted[1].rsid).toBe("rs3"); // high
+    expect(sorted[2].rsid).toBe("rs1"); // moderate
+  });
+
+  it("prefers homozygous risk at same severity", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "high", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", severity: "high", riskAlleleCount: 2 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted[0].rsid).toBe("rs2"); // homozygous
+  });
+
+  it("filters out zero-risk variants", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", riskAlleleCount: 0 }),
+      makeVariant({ rsid: "rs2", riskAlleleCount: 1 }),
+    ];
+    const sorted = prioritizeForResearch(variants);
+    expect(sorted.length).toBe(1);
+    expect(sorted[0].rsid).toBe("rs2");
   });
 });
 

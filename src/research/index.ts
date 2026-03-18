@@ -825,6 +825,41 @@ export class FallbackProvider implements ResearchProviderImpl {
   }
 }
 
+// ─── Research prioritization ────────────────────────────────────
+
+/**
+ * Prioritize variants for research based on clinical significance.
+ * Returns variants sorted by research priority (highest first).
+ * Useful when API call budget is limited.
+ */
+export function prioritizeForResearch(variants: MatchedVariant[]): MatchedVariant[] {
+  const severityScore: Record<string, number> = {
+    critical: 10,
+    high: 8,
+    moderate: 5,
+    low: 2,
+    protective: 3,
+    carrier: 1,
+    informational: 0,
+  };
+
+  return [...variants]
+    .filter((v) => v.riskAlleleCount > 0)
+    .sort((a, b) => {
+      // Primary: severity
+      const sevDiff = (severityScore[b.severity] ?? 0) - (severityScore[a.severity] ?? 0);
+      if (sevDiff !== 0) return sevDiff;
+
+      // Secondary: homozygous risk over heterozygous
+      const homDiff = (b.riskAlleleCount === 2 ? 1 : 0) - (a.riskAlleleCount === 2 ? 1 : 0);
+      if (homDiff !== 0) return homDiff;
+
+      // Tertiary: pharmacogenomics variants get priority (actionable)
+      const pgxDiff = (b.category === "pharmacogenomics" ? 1 : 0) - (a.category === "pharmacogenomics" ? 1 : 0);
+      return pgxDiff;
+    });
+}
+
 // ─── Config helpers ─────────────────────────────────────────────
 
 /**

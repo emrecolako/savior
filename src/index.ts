@@ -51,6 +51,7 @@ export {
   searchClinicalTrials,
   variantResearchBrief,
   createResearchConfig,
+  prioritizeForResearch,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,
