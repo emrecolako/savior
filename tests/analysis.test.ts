@@ -398,6 +398,33 @@ describe("Integration: large database cross-reference", () => {
   });
 });
 
+describe("Cross-reference progress callback", () => {
+  it("calls onProgress with current/total during cross-reference", () => {
+    const genome = makeTestGenome();
+    const calls: [number, number][] = [];
+    crossReference(genome, TEST_DB, (current, total) => {
+      calls.push([current, total]);
+    });
+    expect(calls.length).toBe(TEST_DB.entries.length);
+    expect(calls[0]).toEqual([1, TEST_DB.entries.length]);
+    expect(calls[calls.length - 1]).toEqual([TEST_DB.entries.length, TEST_DB.entries.length]);
+  });
+});
+
+describe("Analysis with filters", () => {
+  it("filters to risk-alleles-only when configured", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB, {
+      input: { filePath: "test.txt" },
+      filters: { onlyRiskAlleles: true },
+    });
+    // All returned variants should have risk alleles (count > 0 or -1)
+    for (const v of result.variants) {
+      expect(v.riskAlleleCount).not.toBe(0);
+    }
+  });
+});
+
 describe("Full analysis pipeline", () => {
   it("runs analyse() end-to-end with test genome", () => {
     const genome = makeTestGenome();
