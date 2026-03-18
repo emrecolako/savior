@@ -35,4 +35,18 @@ Optimize the genomic-report research module and overall test suite for speed and
 - Privacy principle: genome data never leaves the machine
 
 ## What's Been Tried
-_Nothing yet — this is the baseline run._
+
+### ✅ Wins
+1. **Mock sleep in tests** — Exported setSleep/resetSleep from research module. Tests: 7540ms → 372ms (95% reduction)
+2. **Better PubMed queries** — tiab/gene field qualifiers, MeSH human filter, star-allele annotation stripping
+3. **Title deduplication** — Normalized title matching prevents duplicate papers
+4. **Author summaries** — Include first 3 authors + "et al." in finding summaries
+5. **Gene-level deduplication** — Skip redundant API calls for variants in same gene, share findings
+6. **Concurrent batch processing** — Promise.allSettled with controlled concurrency (1 without API key, 3 with)
+7. **Relevance scoring** — Score by rsID mention, gene, condition keywords, journal impact, meta-analysis bonus, recency
+8. **In-memory result caching** — PubMedProvider caches by variant+params, returns copies to prevent mutation
+9. **Abstract fetching** — PubMed efetch API for rich summaries, XML parser with structured label support, HTML stripping
+
+### Current State
+- 71 tests, 339ms (95.5% faster than baseline)
+- Research module: better queries, dedup, caching, abstract fetching, relevance scoring

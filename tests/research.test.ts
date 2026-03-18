@@ -368,6 +368,55 @@ describe("Research relevance scoring", () => {
   });
 });
 
+describe("enrichWithResearch edge cases", () => {
+  it("returns unmodified variants when provider is none", async () => {
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    const result = await enrichWithResearch(variants, {
+      provider: "none",
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(result[0].recentFindings).toBeUndefined();
+  });
+
+  it("returns unmodified variants when disabled", async () => {
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    const result = await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      enabled: false,
+    });
+    expect(result[0].recentFindings).toBeUndefined();
+  });
+
+  it("warns and returns unmodified for unknown provider", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const variants = [makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1 })];
+    await enrichWithResearch(variants, {
+      provider: "unknown" as any,
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown research provider"));
+    expect(variants[0].recentFindings).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it("skips moderate-severity variants", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "moderate", riskAlleleCount: 2 }),
+      makeVariant({ rsid: "rs2", severity: "low", riskAlleleCount: 1 }),
+    ];
+    await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      enabled: true,
+    });
+    expect(variants[0].recentFindings).toBeUndefined();
+    expect(variants[1].recentFindings).toBeUndefined();
+  });
+});
+
 describe("Markdown rendering with research", () => {
   function makeResult(variants: MatchedVariant[]): AnalysisResult {
     return {
