@@ -46,6 +46,8 @@ export {
   generateResearchSummary,
   scoreRelevance,
   extractAbstractFromXml,
+  classifyEvidenceDirection,
+  annotateEvidenceDirection,
   PubMedProvider,
   ExaProvider,
   FallbackProvider,

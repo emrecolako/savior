@@ -1,10 +1,14 @@
 # Autoresearch Ideas
 
-- [x] ~~Implement Exa provider~~ (done)
-- [ ] Add rate limiter class with token bucket for clean NCBI rate limiting
-- [ ] Research result persistence — save findings to disk alongside report for offline access
-- [ ] Add MeSH term enrichment — map gene names to MeSH ontology for better PubMed queries
-- [ ] Add clinical trial search via ClinicalTrials.gov API for actionable trials per variant
-- [ ] Fetch full-text from PMC Open Access for even richer summaries
+## Done
+- [x] ~~Implement Exa provider~~
+- [x] ~~Multi-provider fallback~~
+
+## Next Up
 - [ ] Add variant-specific evidence grading — classify findings as "supports risk", "protective", "neutral"
-- [ ] Multi-provider fallback — try PubMed first, fall back to Exa if no results
+- [ ] Rate limiter class with token bucket — cleaner NCBI rate limiting, replace raw sleep()
+- [ ] Add clinical trial search via ClinicalTrials.gov API for actionable trials per variant
+- [ ] Fetch full-text from PMC Open Access for richer summaries (check pmcid in esummary)
+- [ ] Optimize vitest config — pool threads, isolate false, reduce transform overhead (~130ms)
+- [ ] Add integration test with real snp-database.json (larger cross-reference coverage)
+- [ ] Research result persistence — save/load findings to JSON alongside report

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -510,6 +510,90 @@ describe("Research summary generation", () => {
     const summary = generateResearchSummary(variants);
     expect(summary).toContain("rs1, rs2");
     expect(summary).toContain("APOE");
+  });
+});
+
+describe("Evidence direction classification", () => {
+  it("classifies risk-supporting papers", () => {
+    const finding = {
+      title: "rs429358 is associated with increased risk of Alzheimer's disease",
+      source: "Nat Genet", url: "", date: "2025",
+      summary: "This variant is a known risk factor with elevated susceptibility.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("supports-risk");
+  });
+
+  it("classifies protective papers", () => {
+    const finding = {
+      title: "Protective variant reduces risk of cardiovascular disease",
+      source: "Lancet", url: "", date: "2025",
+      summary: "This allele is associated with decreased risk and beneficial outcomes.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("protective");
+  });
+
+  it("classifies neutral/null results", () => {
+    const finding = {
+      title: "No significant association between rs429358 and disease",
+      source: "BMJ", url: "", date: "2025",
+      summary: "Failed to replicate the previously reported association. Null result.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("neutral");
+  });
+
+  it("returns uncertain when no clear signal", () => {
+    const finding = {
+      title: "Genetic architecture of complex traits",
+      source: "Science", url: "", date: "2025",
+      summary: "A broad overview of genomic approaches.",
+    };
+    expect(classifyEvidenceDirection(finding, makeVariant())).toBe("uncertain");
+  });
+
+  it("handles protective variants correctly", () => {
+    const finding = {
+      title: "This allele provides reduced risk of disease",
+      source: "Nature", url: "", date: "2025",
+      summary: "Protective effect confirmed in large cohort.",
+    };
+    const protectiveVariant = makeVariant({ severity: "protective" as any });
+    expect(classifyEvidenceDirection(finding, protectiveVariant)).toBe("protective");
+  });
+});
+
+describe("annotateEvidenceDirection", () => {
+  it("annotates all findings on variants", () => {
+    const variants = [
+      makeVariant({
+        recentFindings: [
+          { title: "Increased risk of disease", source: "J1", url: "", date: "2025", summary: "risk factor" },
+          { title: "No association found", source: "J2", url: "", date: "2025", summary: "no significant association" },
+        ],
+      }),
+    ];
+    annotateEvidenceDirection(variants);
+    expect(variants[0].recentFindings![0].evidenceDirection).toBe("supports-risk");
+    expect(variants[0].recentFindings![1].evidenceDirection).toBe("neutral");
+  });
+
+  it("skips findings that already have direction", () => {
+    const variants = [
+      makeVariant({
+        recentFindings: [
+          { title: "Some paper", source: "J1", url: "", date: "2025", summary: "increased risk", evidenceDirection: "protective" as any },
+        ],
+      }),
+    ];
+    annotateEvidenceDirection(variants);
+    // Should preserve existing annotation
+    expect(variants[0].recentFindings![0].evidenceDirection).toBe("protective");
+  });
+
+  it("skips variants without findings", () => {
+    const variants = [makeVariant()];
+    // Should not throw
+    annotateEvidenceDirection(variants);
+    expect(variants[0].recentFindings).toBeUndefined();
   });
 });
 

@@ -101,12 +101,15 @@ export interface MatchedVariant {
   recentFindings?: ResearchFinding[];
 }
 
+export type EvidenceDirection = "supports-risk" | "protective" | "neutral" | "uncertain";
+
 export interface ResearchFinding {
   title: string;
   source: string;                  // journal, preprint server
   url: string;
   date: string;
   summary: string;
+  evidenceDirection?: EvidenceDirection;  // auto-classified direction of evidence
 }
 
 export interface ApoeGenotype {

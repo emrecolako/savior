@@ -15,7 +15,7 @@
  * 3. Update the `ResearchProvider` union type in `types.ts`
  */
 
-import type { MatchedVariant, ResearchFinding, ResearchConfig } from "../types.js";
+import type { MatchedVariant, ResearchFinding, ResearchConfig, EvidenceDirection } from "../types.js";
 
 // ─── Helpers ────────────────────────────────────────────────────
 
@@ -410,6 +410,91 @@ export function scoreRelevance(finding: ResearchFinding, variant: MatchedVariant
   return score;
 }
 
+// ─── Evidence direction classification ──────────────────────────
+
+const RISK_KEYWORDS = [
+  "increased risk", "higher risk", "elevated risk", "risk factor",
+  "susceptibility", "predisposition", "associated with increased",
+  "contributes to", "pathogenic", "deleterious", "loss of function",
+  "damaging", "risk allele", "odds ratio", "hazard ratio",
+];
+
+const PROTECTIVE_KEYWORDS = [
+  "protective", "reduced risk", "lower risk", "decreased risk",
+  "beneficial", "associated with decreased", "gain of function",
+  "longevity", "resistance to", "protects against",
+];
+
+const NEUTRAL_KEYWORDS = [
+  "no significant association", "no association", "not associated",
+  "no evidence", "inconclusive", "conflicting", "nonsignificant",
+  "failed to replicate", "null result",
+];
+
+/**
+ * Classify the evidence direction of a research finding relative to a variant.
+ * Uses keyword matching on title and summary to determine if the paper
+ * supports risk, suggests protection, or is neutral/uncertain.
+ */
+export function classifyEvidenceDirection(
+  finding: ResearchFinding,
+  variant: MatchedVariant
+): EvidenceDirection {
+  const text = (finding.title + " " + finding.summary).toLowerCase();
+
+  let riskScore = 0;
+  let protectiveScore = 0;
+  let neutralScore = 0;
+
+  for (const kw of RISK_KEYWORDS) {
+    if (text.includes(kw)) riskScore++;
+  }
+  for (const kw of PROTECTIVE_KEYWORDS) {
+    if (text.includes(kw)) protectiveScore++;
+  }
+  for (const kw of NEUTRAL_KEYWORDS) {
+    if (text.includes(kw)) neutralScore++;
+  }
+
+  // Context: if the variant itself is marked protective in the DB,
+  // a "risk" paper may actually be confirming protection
+  const isProtectiveVariant = variant.severity === "protective";
+
+  if (neutralScore > 0 && neutralScore >= riskScore && neutralScore >= protectiveScore) {
+    return "neutral";
+  }
+
+  if (isProtectiveVariant) {
+    // For protective variants, "increased risk" in absence of the allele
+    // actually supports the protective classification
+    if (protectiveScore > 0 || riskScore > 0) return "protective";
+  }
+
+  if (riskScore > protectiveScore && riskScore > neutralScore) {
+    return "supports-risk";
+  }
+  if (protectiveScore > riskScore && protectiveScore > neutralScore) {
+    return "protective";
+  }
+
+  return "uncertain";
+}
+
+/**
+ * Annotate all findings on matched variants with evidence direction.
+ * Mutates findings in place.
+ */
+export function annotateEvidenceDirection(variants: MatchedVariant[]): void {
+  for (const v of variants) {
+    if (!v.recentFindings) continue;
+    for (const f of v.recentFindings) {
+      if (!f.evidenceDirection) {
+        f.evidenceDirection = classifyEvidenceDirection(f, v);
+      }
+    }
+  }
+}
+
 // ─── Research summary generator ─────────────────────────────────
 
 /**
@@ -569,6 +654,9 @@ export async function enrichWithResearch(
       }
     }
   }
+
+  // Annotate all findings with evidence direction
+  annotateEvidenceDirection(variants);
 
   return variants;
 }
