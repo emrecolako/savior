@@ -347,6 +347,29 @@ describe("PubMedProvider query building", () => {
   });
 });
 
+describe("PubMedProvider query edge cases", () => {
+  it("handles condition with special characters", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant({
+      gene: "HLA-DRB1",
+      condition: "Type 1 diabetes / autoimmune (HLA-linked)",
+    }));
+    expect(query).toContain('"HLA-DRB1"[gene]');
+    expect(query).toContain("Type 1 diabetes");
+  });
+
+  it("handles condition with multiple star-allele annotations", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant({
+      gene: "CYP2D6",
+      condition: "CYP2D6*4/*4 — poor metabolizer, CYP2D6*10 — decreased function",
+    }));
+    expect(query).not.toContain("*4");
+    expect(query).not.toContain("*10");
+    expect(query).toContain("poor metabolizer");
+  });
+});
+
 describe("PubMedProvider caching", () => {
   it("returns cached results on second call for same variant", async () => {
     let fetchCount = 0;
