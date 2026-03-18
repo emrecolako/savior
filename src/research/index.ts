@@ -82,9 +82,15 @@ export class ExaProvider implements ResearchProviderImpl {
 export class PubMedProvider implements ResearchProviderImpl {
   name = "pubmed";
   private apiKey?: string;
+  private cache = new Map<string, ResearchFinding[]>();
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey;
+  }
+
+  /** Clear the in-memory cache. */
+  clearCache(): void {
+    this.cache.clear();
   }
 
   /**
@@ -116,6 +122,11 @@ export class PubMedProvider implements ResearchProviderImpl {
   }
 
   async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
+    // Check cache first
+    const cacheKey = `${variant.rsid}:${variant.gene}:${maxResults}:${minYear ?? ""}`;
+    const cached = this.cache.get(cacheKey);
+    if (cached) return [...cached]; // Return copy to prevent mutation
+
     const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
 
     const query = this.buildQuery(variant, minYear);
@@ -169,7 +180,12 @@ export class PubMedProvider implements ResearchProviderImpl {
     await sleep(350);
 
     // Sort by relevance score (highest first)
-    return results.sort((a, b) => scoreRelevance(b, variant) - scoreRelevance(a, variant));
+    const sorted = results.sort((a, b) => scoreRelevance(b, variant) - scoreRelevance(a, variant));
+
+    // Cache for subsequent lookups
+    this.cache.set(cacheKey, sorted);
+
+    return sorted;
   }
 }
 

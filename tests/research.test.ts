@@ -206,6 +206,33 @@ describe("PubMedProvider query building", () => {
   });
 });
 
+describe("PubMedProvider caching", () => {
+  it("returns cached results on second call for same variant", async () => {
+    let fetchCount = 0;
+    vi.stubGlobal("fetch", (url: string) => {
+      fetchCount++;
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+    });
+
+    const provider = new PubMedProvider();
+    const variant = makeVariant();
+
+    const first = await provider.search(variant, 3, 2024);
+    const fetchCountAfterFirst = fetchCount;
+
+    const second = await provider.search(variant, 3, 2024);
+    // Second call should not make any fetch requests
+    expect(fetchCount).toBe(fetchCountAfterFirst);
+    expect(second).toEqual(first);
+    // Cached copy should be independent (no shared reference)
+    expect(second).not.toBe(first);
+  });
+});
+
 describe("PubMedProvider deduplication", () => {
   it("deduplicates results with identical normalized titles", async () => {
     vi.stubGlobal("fetch", (url: string) => {
