@@ -41,7 +41,17 @@ export { loadPgsIndex, loadPgsScoringFile, loadAllPgsScoringFiles } from "./data
 export { generateReport, writeMarkdownReport, generateMarkdown, writeJsonReport, writeGpCard, writeGpCardJsonFile, generateGpCardMarkdown, generateGpCardJson } from "./reports/index.js";
 
 // Research
-export { enrichWithResearch } from "./research/index.js";
+export {
+  enrichWithResearch,
+  generateResearchSummary,
+  scoreRelevance,
+  extractAbstractFromXml,
+  PubMedProvider,
+  ExaProvider,
+  setSleep,
+  resetSleep,
+} from "./research/index.js";
+export type { ResearchProviderImpl } from "./research/index.js";
 
 // Types
 export type * from "./types.js";
