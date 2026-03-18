@@ -64,6 +64,18 @@ Optimize the genomic-report research module and overall test suite for speed and
 22. **PMC URL extraction** — Detect pmcid from esummary for open access full text
 23. **Integration test** — Full snp-database.json cross-reference + severity sort validation
 
+24. **PMC URL extraction** — Detect pmcid from esummary for open access full text links
+25. **Variant research brief** — One-liner evidence summary per variant
+26. **Research prioritization** — Sort variants by research urgency for API budget optimization
+27. **Config helper** — createResearchConfig with sensible defaults
+28. **End-to-end tests** — Full analyse() pipeline + executive summary validation
+
+### ❌ Dead Ends
+- Pre-computed pathway matchers (WeakMap/Set) — overhead exceeds benefit on small datasets
+- vitest pool=forks — slower than threads for 4 test files
+- vitest concurrent=true — shared mock state causes flaky tests
+- minThreads=8 — diminishing returns, sweet spot is 4
+
 ### Current State
-- 102 tests, ~200ms (97.3% faster than baseline of 7540ms)
-- Research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summary, clinical trials, persistence, rate limiting, timeouts, PMC links
+- 112 tests, ~173-199ms (97.7% faster than baseline of 7540ms)
+- Research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summary with direction breakdown, clinical trials, persistence, rate limiting, timeouts, PMC links, prioritization, config helpers

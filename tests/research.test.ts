@@ -898,6 +898,42 @@ describe("Research persistence", () => {
   });
 });
 
+describe("Full research pipeline", () => {
+  it("enriches, annotates, summarizes, and generates briefs in sequence", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", gene: "APOE", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2", severity: "high", riskAlleleCount: 2 }),
+      makeVariant({ rsid: "rs3", gene: "TP53", severity: "moderate", riskAlleleCount: 1 }),
+    ];
+
+    // Step 1: Enrich with research
+    const enriched = await enrichWithResearch(variants, createResearchConfig({ provider: "pubmed" }));
+
+    // Step 2: Should have findings on critical/high variants only
+    expect(enriched[0].recentFindings).toBeDefined();
+    expect(enriched[1].recentFindings).toBeDefined();
+    expect(enriched[2].recentFindings).toBeUndefined(); // moderate
+
+    // Step 3: Evidence direction should be auto-annotated
+    for (const v of enriched.filter((v) => v.recentFindings?.length)) {
+      for (const f of v.recentFindings!) {
+        expect(f.evidenceDirection).toBeDefined();
+      }
+    }
+
+    // Step 4: Generate summary
+    const summary = generateResearchSummary(enriched);
+    expect(summary).toContain("APOE");
+    expect(summary).toContain("BRCA2");
+
+    // Step 5: Generate briefs
+    const brief1 = variantResearchBrief(enriched[0]);
+    expect(brief1).toContain("APOE");
+    const brief3 = variantResearchBrief(enriched[2]);
+    expect(brief3).toContain("No recent research");
+  });
+});
+
 describe("Markdown rendering with research", () => {
   function makeResult(variants: MatchedVariant[]): AnalysisResult {
     return {
