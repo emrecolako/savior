@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -925,6 +925,30 @@ describe("Research persistence", () => {
   it("returns false when file doesn't exist", () => {
     const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
     expect(loaded).toBe(false);
+  });
+});
+
+describe("mergeFindings", () => {
+  it("deduplicates by normalized title", () => {
+    const a = [
+      { title: "APOE Study", source: "Nature", url: "u1", date: "2025", summary: "Short" },
+    ];
+    const b = [
+      { title: "APOE Study", source: "Science", url: "u2", date: "2025", summary: "A much longer and more detailed summary" },
+      { title: "Different Paper", source: "Lancet", url: "u3", date: "2025", summary: "Another" },
+    ];
+    const merged = mergeFindings(a, b);
+    expect(merged.length).toBe(2);
+    // Should keep the version with the longer summary
+    const apoe = merged.find((f) => f.title === "APOE Study")!;
+    expect(apoe.summary).toContain("much longer");
+  });
+
+  it("preserves PMC URL from either source", () => {
+    const a = [{ title: "Paper", source: "J", url: "u1", date: "2025", summary: "Short" }];
+    const b = [{ title: "Paper", source: "J", url: "u2", date: "2025", summary: "Short", pmcUrl: "https://pmc/1" }];
+    const merged = mergeFindings(a, b);
+    expect(merged[0].pmcUrl).toBe("https://pmc/1");
   });
 });
 

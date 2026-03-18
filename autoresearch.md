@@ -76,6 +76,11 @@ Optimize the genomic-report research module and overall test suite for speed and
 - vitest concurrent=true — shared mock state causes flaky tests
 - minThreads=8 — diminishing returns, sweet spot is 4
 
+29. **Research landscape overview** — One-paragraph summary for reports
+30. **Research gaps detection** — Identifies high-priority variants without research
+31. **Abstract fetch test** — End-to-end efetch XML → summary population
+
 ### Current State
-- 112 tests, ~173-199ms (97.7% faster than baseline of 7540ms)
-- Research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summary with direction breakdown, clinical trials, persistence, rate limiting, timeouts, PMC links, prioritization, config helpers
+- 119 tests, ~190-220ms (97%+ faster than baseline of 7540ms)  
+- Tests more than doubled (+105%)
+- Full research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summaries, clinical trials, persistence, rate limiting, timeouts, PMC links, prioritization, research gaps, landscape overview

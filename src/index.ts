@@ -54,6 +54,7 @@ export {
   prioritizeForResearch,
   researchLandscapeOverview,
   findResearchGaps,
+  mergeFindings,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,

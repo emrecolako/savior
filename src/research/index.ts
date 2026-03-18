@@ -921,6 +921,34 @@ export function findResearchGaps(variants: MatchedVariant[]): MatchedVariant[] {
   });
 }
 
+/**
+ * Merge research findings from multiple enrichment runs (e.g., PubMed + Exa).
+ * Deduplicates by normalized title and keeps the version with the best summary.
+ */
+export function mergeFindings(
+  existing: ResearchFinding[],
+  additional: ResearchFinding[]
+): ResearchFinding[] {
+  const seen = new Map<string, ResearchFinding>();
+
+  for (const f of [...existing, ...additional]) {
+    const key = f.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const current = seen.get(key);
+    if (!current) {
+      seen.set(key, f);
+    } else {
+      // Keep the version with the longer/richer summary
+      if (f.summary.length > current.summary.length) {
+        seen.set(key, { ...f, pmcUrl: f.pmcUrl ?? current.pmcUrl });
+      } else if (current.pmcUrl === undefined && f.pmcUrl) {
+        seen.set(key, { ...current, pmcUrl: f.pmcUrl });
+      }
+    }
+  }
+
+  return [...seen.values()];
+}
+
 // ─── Config helpers ─────────────────────────────────────────────
 
 /**
