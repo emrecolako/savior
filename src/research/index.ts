@@ -87,16 +87,42 @@ export class PubMedProvider implements ResearchProviderImpl {
     this.apiKey = apiKey;
   }
 
-  async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
-    const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+  /**
+   * Build an optimized PubMed query for a variant.
+   *
+   * Strategy:
+   * 1. Search by rsID (most specific)
+   * 2. OR search by gene + simplified condition keywords
+   * 3. Apply date filter and sort by relevance
+   */
+  buildQuery(variant: MatchedVariant, minYear?: number): string {
+    // Extract key condition terms, stripping annotations like "CYP2C9*2 —"
+    const conditionClean = variant.condition
+      .replace(/\*\d+\w?\s*—?\s*/g, "")  // Remove star-allele annotations
+      .replace(/\s+/g, " ")
+      .trim();
 
-    // Build query: rsid OR (gene AND condition)
-    let query = `"${variant.rsid}" OR ("${variant.gene}" AND "${variant.condition}")`;
+    // Build tiered query: exact rsID is most specific, gene+condition is broader
+    let query = `"${variant.rsid}"[tiab] OR ("${variant.gene}"[gene] AND "${conditionClean}"[tiab])`;
+
     if (minYear) {
       query += ` AND ${minYear}:3000[dp]`;
     }
 
-    let searchUrl = `${BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${maxResults}&retmode=json`;
+    // Prefer reviews and meta-analyses for higher-quality results
+    query += ` AND (humans[mesh])`;
+
+    return query;
+  }
+
+  async search(variant: MatchedVariant, maxResults: number, minYear?: number): Promise<ResearchFinding[]> {
+    const BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils";
+
+    const query = this.buildQuery(variant, minYear);
+
+    // Request extra results to allow deduplication, sort by relevance
+    const fetchCount = Math.min(maxResults * 2, 20);
+    let searchUrl = `${BASE}/esearch.fcgi?db=pubmed&term=${encodeURIComponent(query)}&retmax=${fetchCount}&sort=relevance&retmode=json`;
     if (this.apiKey) searchUrl += `&api_key=${this.apiKey}`;
 
     const searchData = await fetchWithRetry(searchUrl);
@@ -110,17 +136,34 @@ export class PubMedProvider implements ResearchProviderImpl {
 
     const summaryData = await fetchWithRetry(summaryUrl);
     const results: ResearchFinding[] = [];
+    const seenTitles = new Set<string>();
 
     for (const pmid of pmids) {
       const article = summaryData?.result?.[pmid];
       if (!article) continue;
+
+      const title = article.title ?? "Untitled";
+
+      // Deduplicate by normalized title (handles minor formatting differences)
+      const normalizedTitle = title.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (seenTitles.has(normalizedTitle)) continue;
+      seenTitles.add(normalizedTitle);
+
+      // Build a more informative summary from available metadata
+      const authors = article.authors?.slice(0, 3)?.map((a: any) => a.name).join(", ") ?? "";
+      const authorsText = authors ? `${authors}${article.authors?.length > 3 ? " et al." : ""}` : "";
+      const summary = authorsText ? `${authorsText}. ${title}` : title;
+
       results.push({
-        title: article.title ?? "Untitled",
+        title,
         source: article.source ?? "Unknown journal",
         url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
         date: article.pubdate ?? "Unknown date",
-        summary: article.title ?? "",
+        summary,
       });
+
+      // Stop once we have enough deduplicated results
+      if (results.length >= maxResults) break;
     }
 
     await sleep(350);
@@ -167,16 +210,34 @@ export async function enrichWithResearch(
 
   console.log(`Researching ${toResearch.length} high-priority variants via ${config.provider}...`);
 
+  // Deduplicate by gene to avoid redundant searches for variants in the same gene
+  const researchedGenes = new Set<string>();
+
   for (const variant of toResearch) {
+    // Skip if we've already researched a variant in the same gene
+    // (findings for the same gene are usually highly overlapping)
+    if (researchedGenes.has(variant.gene)) {
+      // Copy findings from the first variant in this gene
+      const donor = toResearch.find(
+        (v) => v.gene === variant.gene && v.recentFindings && v.recentFindings.length > 0
+      );
+      if (donor) {
+        variant.recentFindings = [...donor.recentFindings!];
+      }
+      continue;
+    }
+
     try {
       variant.recentFindings = await provider.search(
         variant,
         config.maxResultsPerVariant,
         config.minYear
       );
+      researchedGenes.add(variant.gene);
     } catch (err: any) {
       console.warn(`Failed to research ${variant.rsid}: ${err.message}`);
       variant.recentFindings = [];
+      researchedGenes.add(variant.gene);
     }
   }
 

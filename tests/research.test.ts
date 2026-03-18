@@ -82,7 +82,7 @@ describe("PubMedProvider", () => {
     const searchUrl = fetchCalls.find((u) => u.includes("esearch.fcgi"));
     expect(searchUrl).toBeDefined();
     expect(searchUrl).toContain("db=pubmed");
-    expect(searchUrl).toContain("retmax=3");
+    expect(searchUrl).toContain("retmax=6"); // fetches 2x for deduplication headroom
     expect(searchUrl).toContain(encodeURIComponent('"rs429358"'));
     expect(searchUrl).toContain(encodeURIComponent("2024:3000[dp]"));
   });
@@ -164,8 +164,8 @@ describe("enrichWithResearch", () => {
     });
 
     const variants = [
-      makeVariant({ rsid: "rs-fail", severity: "critical", riskAlleleCount: 1 }),
-      makeVariant({ rsid: "rs-ok", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs-fail", gene: "BRCA1", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs-ok", gene: "BRCA2", severity: "critical", riskAlleleCount: 1 }),
     ];
 
     await enrichWithResearch(variants, {
@@ -176,6 +176,97 @@ describe("enrichWithResearch", () => {
 
     // First variant fails gracefully after all retries, second succeeds
     expect(variants[0].recentFindings).toEqual([]);
+    expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("PubMedProvider query building", () => {
+  it("strips star-allele annotations from condition in query", () => {
+    const provider = new PubMedProvider();
+    const variant = makeVariant({
+      gene: "CYP2C9",
+      condition: "CYP2C9*2 — warfarin sensitivity",
+    });
+    const query = provider.buildQuery(variant, 2024);
+    expect(query).toContain('"CYP2C9"[gene]');
+    expect(query).toContain("warfarin sensitivity");
+    expect(query).not.toContain("*2");
+  });
+
+  it("includes MeSH human filter", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant());
+    expect(query).toContain("humans[mesh]");
+  });
+
+  it("uses tiab search for rsID", () => {
+    const provider = new PubMedProvider();
+    const query = provider.buildQuery(makeVariant());
+    expect(query).toContain('"rs429358"[tiab]');
+  });
+});
+
+describe("PubMedProvider deduplication", () => {
+  it("deduplicates results with identical normalized titles", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            esearchresult: { idlist: ["1", "2", "3"] },
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          result: {
+            "1": { title: "APOE and Alzheimer's Disease", source: "Nature", pubdate: "2025" },
+            "2": { title: "APOE and Alzheimer's Disease", source: "Science", pubdate: "2025" },  // duplicate
+            "3": { title: "Different Paper", source: "Lancet", pubdate: "2025" },
+          },
+        }),
+      });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 5);
+    expect(findings).toHaveLength(2);
+    expect(findings[0].title).toBe("APOE and Alzheimer's Disease");
+    expect(findings[1].title).toBe("Different Paper");
+  });
+});
+
+describe("enrichWithResearch gene deduplication", () => {
+  it("shares findings across variants in the same gene", async () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", gene: "APOE", severity: "critical", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs2", gene: "APOE", severity: "high", riskAlleleCount: 1 }),
+      makeVariant({ rsid: "rs3", gene: "BRCA2", severity: "critical", riskAlleleCount: 1 }),
+    ];
+
+    let searchCount = 0;
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        searchCount++;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+    });
+
+    await enrichWithResearch(variants, {
+      provider: "pubmed",
+      maxResultsPerVariant: 3,
+      minYear: 2024,
+      enabled: true,
+    });
+
+    // Should only make 2 esearch calls (APOE + BRCA2), not 3
+    expect(searchCount).toBe(2);
+    // Both APOE variants should have findings
+    expect(variants[0].recentFindings!.length).toBeGreaterThan(0);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
   });
 });
