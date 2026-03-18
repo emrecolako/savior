@@ -167,8 +167,55 @@ export class PubMedProvider implements ResearchProviderImpl {
     }
 
     await sleep(350);
-    return results;
+
+    // Sort by relevance score (highest first)
+    return results.sort((a, b) => scoreRelevance(b, variant) - scoreRelevance(a, variant));
   }
+}
+
+// ─── Research quality scoring ────────────────────────────────────
+
+/**
+ * Score a research finding's relevance to the queried variant.
+ * Higher scores indicate more relevant papers.
+ */
+export function scoreRelevance(finding: ResearchFinding, variant: MatchedVariant): number {
+  let score = 0;
+  const titleLower = finding.title.toLowerCase();
+  const summaryLower = finding.summary.toLowerCase();
+  const text = titleLower + " " + summaryLower;
+
+  // Direct rsID mention is very specific
+  if (text.includes(variant.rsid.toLowerCase())) score += 10;
+
+  // Gene name mention
+  if (text.includes(variant.gene.toLowerCase())) score += 5;
+
+  // Condition keywords
+  const condWords = variant.condition.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
+  for (const word of condWords) {
+    if (text.includes(word)) score += 2;
+  }
+
+  // Prefer meta-analyses and reviews
+  if (text.includes("meta-analysis") || text.includes("meta analysis")) score += 3;
+  if (text.includes("systematic review")) score += 3;
+  if (text.includes("genome-wide") || text.includes("gwas")) score += 2;
+
+  // Prefer high-impact journals
+  const highImpact = ["nature", "science", "lancet", "jama", "bmj", "cell", "n engl j med"];
+  if (highImpact.some((j) => finding.source.toLowerCase().includes(j))) score += 3;
+
+  // Recency bonus (extract year from date)
+  const yearMatch = finding.date.match(/(\d{4})/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[1]);
+    const currentYear = new Date().getFullYear();
+    if (year >= currentYear) score += 2;
+    else if (year >= currentYear - 1) score += 1;
+  }
+
+  return score;
 }
 
 // ─── Provider registry ──────────────────────────────────────────

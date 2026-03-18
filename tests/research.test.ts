@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, enrichWithResearch, setSleep, resetSleep } from "../src/research/index.js";
+import { PubMedProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -268,6 +268,47 @@ describe("enrichWithResearch gene deduplication", () => {
     // Both APOE variants should have findings
     expect(variants[0].recentFindings!.length).toBeGreaterThan(0);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Research relevance scoring", () => {
+  it("scores papers mentioning rsID higher", () => {
+    const variant = makeVariant({ rsid: "rs429358", gene: "APOE" });
+    const withRsid = scoreRelevance(
+      { title: "rs429358 in Alzheimer's disease", source: "J Neurol", url: "", date: "2025", summary: "" },
+      variant
+    );
+    const withoutRsid = scoreRelevance(
+      { title: "Genetics of neurodegenerative disease", source: "J Neurol", url: "", date: "2025", summary: "" },
+      variant
+    );
+    expect(withRsid).toBeGreaterThan(withoutRsid);
+  });
+
+  it("scores meta-analyses and high-impact journals higher", () => {
+    const variant = makeVariant();
+    const metaAnalysis = scoreRelevance(
+      { title: "Meta-analysis of APOE", source: "Nature Genetics", url: "", date: "2025", summary: "" },
+      variant
+    );
+    const regularPaper = scoreRelevance(
+      { title: "Study of APOE", source: "Small Journal", url: "", date: "2025", summary: "" },
+      variant
+    );
+    expect(metaAnalysis).toBeGreaterThan(regularPaper);
+  });
+
+  it("gives recency bonus to current year papers", () => {
+    const variant = makeVariant();
+    const recent = scoreRelevance(
+      { title: "APOE study", source: "Nature", url: "", date: "2026 Jan", summary: "" },
+      variant
+    );
+    const older = scoreRelevance(
+      { title: "APOE study", source: "Nature", url: "", date: "2020 Jan", summary: "" },
+      variant
+    );
+    expect(recent).toBeGreaterThan(older);
   });
 });
 
