@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
 import { crossReference, determineApoe, detectPathways } from "../src/analysis/engine.js";
 import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
+import { loadDatabase } from "../src/database/loader.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
 
 const TMP = join(tmpdir(), "genomic-report-tests");
@@ -286,6 +287,26 @@ describe("Pathway convergence", () => {
 });
 
 // ─── Pharmacogenomics / Drug-Gene Matrix ─────────────────────
+
+describe("Integration: large database cross-reference", () => {
+  it("handles full snp-database.json without errors", () => {
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+
+    expect(fullDb.entries.length).toBeGreaterThan(1000);
+
+    const variants = crossReference(genome, fullDb);
+    // Should match some variants from the full DB
+    expect(variants.length).toBeGreaterThanOrEqual(4); // at minimum our test SNPs
+    // Should be sorted by severity
+    for (let i = 1; i < variants.length; i++) {
+      const severityRank: Record<string, number> = { critical: 0, high: 1, moderate: 2, low: 3, protective: 4, carrier: 5, informational: 6 };
+      const prev = severityRank[variants[i - 1].severity] ?? 99;
+      const curr = severityRank[variants[i].severity] ?? 99;
+      expect(prev).toBeLessThanOrEqual(curr);
+    }
+  });
+});
 
 describe("Drug-gene interaction matrix", () => {
   it("returns metabolizer status for all 11 PGx genes", () => {
