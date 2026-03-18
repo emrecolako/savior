@@ -134,6 +134,36 @@ describe("APOE determination", () => {
     expect(apoe.riskLevel).toBe("average");
   });
 
+  it("determines e3/e4 correctly (elevated risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tCT\nrs7412\t19\t45412079\tCC\n`;
+    const path = join(TMP, "apoe-e3e4.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e3/e4");
+    expect(apoe.riskLevel).toBe("elevated");
+  });
+
+  it("determines e4/e4 correctly (high risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tCC\nrs7412\t19\t45412079\tCC\n`;
+    const path = join(TMP, "apoe-e4e4.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e4/e4");
+    expect(apoe.riskLevel).toBe("high");
+  });
+
+  it("determines e2/e3 correctly (low risk)", () => {
+    const data = `# test\nrs429358\t19\t45411941\tTT\nrs7412\t19\t45412079\tCT\n`;
+    const path = join(TMP, "apoe-e2e3.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const apoe = determineApoe(genome);
+    expect(apoe.diplotype).toBe("e2/e3");
+    expect(apoe.riskLevel).toBe("low");
+  });
+
   it("handles missing SNPs gracefully", () => {
     const data = `# test\nrs999\t1\t100\tAA\n`;
     const path = join(TMP, "apoe-missing.txt");
