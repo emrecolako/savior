@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
 import { crossReference, determineApoe, detectPathways, analyse, generateActionItems } from "../src/analysis/engine.js";
 import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
-import { loadDatabase } from "../src/database/loader.js";
+import { loadDatabase, filterDatabase } from "../src/database/loader.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
 
 const TMP = join(tmpdir(), "genomic-report-tests");
@@ -375,6 +375,33 @@ describe("Action item generation", () => {
 
     // Should at least have some actions
     expect(actions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Database filtering", () => {
+  it("filters by category", () => {
+    const filtered = filterDatabase(TEST_DB, { categories: ["pharmacogenomics"] });
+    expect(filtered.length).toBe(2); // CYP2C9 and COMT
+    expect(filtered.every((e) => e.category === "pharmacogenomics")).toBe(true);
+  });
+
+  it("filters by minimum severity", () => {
+    const filtered = filterDatabase(TEST_DB, { minSeverity: "critical" });
+    expect(filtered.every((e) => e.severity === "critical")).toBe(true);
+  });
+
+  it("combines category and severity filters", () => {
+    const filtered = filterDatabase(TEST_DB, {
+      categories: ["pharmacogenomics"],
+      minSeverity: "moderate",
+    });
+    // CYP2C9 (critical) and COMT (moderate) both pass
+    expect(filtered.length).toBe(2);
+  });
+
+  it("returns all entries with no filters", () => {
+    const filtered = filterDatabase(TEST_DB, {});
+    expect(filtered.length).toBe(TEST_DB.entries.length);
   });
 });
 
