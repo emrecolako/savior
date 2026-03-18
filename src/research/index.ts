@@ -33,27 +33,59 @@ export function resetSleep() {
 
 const sleep = (ms: number) => _sleep(ms);
 
-async function fetchWithRetry(url: string, retries = 2): Promise<any> {
+export async function fetchWithRetry(url: string, retries = 2, timeoutMs = 10000): Promise<any> {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(url);
-    if (res.ok) return res.json();
-    if (attempt < retries) {
-      await sleep(1000 * 2 ** attempt);
-      continue;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) return res.json();
+      if (attempt < retries) {
+        await sleep(1000 * 2 ** attempt);
+        continue;
+      }
+      throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
+    } catch (err: any) {
+      clearTimeout(timer);
+      if (err.name === "AbortError") {
+        if (attempt < retries) {
+          await sleep(1000 * 2 ** attempt);
+          continue;
+        }
+        throw new Error(`Timeout after ${timeoutMs}ms from ${new URL(url).hostname}`);
+      }
+      throw err;
     }
-    throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
   }
 }
 
-async function fetchText(url: string, retries = 2): Promise<string> {
+export async function fetchText(url: string, retries = 2, timeoutMs = 10000): Promise<string> {
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const res = await fetch(url);
-    if (res.ok) return (res as any).text ? await (res as any).text() : "";
-    if (attempt < retries) {
-      await sleep(1000 * 2 ** attempt);
-      continue;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      if (res.ok) return (res as any).text ? await (res as any).text() : "";
+      if (attempt < retries) {
+        await sleep(1000 * 2 ** attempt);
+        continue;
+      }
+      throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
+    } catch (err: any) {
+      clearTimeout(timer);
+      if (err.name === "AbortError") {
+        if (attempt < retries) {
+          await sleep(1000 * 2 ** attempt);
+          continue;
+        }
+        throw new Error(`Timeout after ${timeoutMs}ms from ${new URL(url).hostname}`);
+      }
+      throw err;
     }
-    throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
   }
   return "";
 }

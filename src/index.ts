@@ -48,6 +48,7 @@ export {
   extractAbstractFromXml,
   PubMedProvider,
   ExaProvider,
+  FallbackProvider,
   setSleep,
   resetSleep,
 } from "./research/index.js";
