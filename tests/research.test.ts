@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings, classifySourceType, isOutdated, annotateSourceMetadata } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps, mergeFindings, classifySourceType, isOutdated, annotateSourceMetadata, generateVariantLinks } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -993,6 +993,17 @@ describe("Research age detection", () => {
 
   it("returns false when date is unparseable", () => {
     expect(isOutdated({ title: "T", source: "J", url: "", date: "Unknown", summary: "" })).toBe(false);
+  });
+});
+
+describe("Variant link generation", () => {
+  it("generates all database links for an rsID", () => {
+    const links = generateVariantLinks("rs429358");
+    expect(links.dbSnp).toBe("https://www.ncbi.nlm.nih.gov/snp/rs429358");
+    expect(links.clinVar).toContain("rs429358");
+    expect(links.gnomAd).toContain("rs429358");
+    expect(links.ensembl).toContain("rs429358");
+    expect(links.openTargets).toContain("rs429358");
   });
 });
 

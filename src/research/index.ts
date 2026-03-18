@@ -613,6 +613,29 @@ export function annotateSourceMetadata(variants: MatchedVariant[], maxAgeYears =
   }
 }
 
+// ─── Variant link enrichment ────────────────────────────────────
+
+/**
+ * Generate useful external database links for a variant.
+ */
+export interface VariantLinks {
+  dbSnp: string;
+  clinVar: string;
+  gnomAd: string;
+  ensembl: string;
+  openTargets: string;
+}
+
+export function generateVariantLinks(rsid: string): VariantLinks {
+  return {
+    dbSnp: `https://www.ncbi.nlm.nih.gov/snp/${rsid}`,
+    clinVar: `https://www.ncbi.nlm.nih.gov/clinvar/?term=${rsid}`,
+    gnomAd: `https://gnomad.broadinstitute.org/variant/${rsid}`,
+    ensembl: `https://www.ensembl.org/Homo_sapiens/Variation/Explore?v=${rsid}`,
+    openTargets: `https://genetics.opentargets.org/variant/${rsid}`,
+  };
+}
+
 // ─── Research summary generator ─────────────────────────────────
 
 /**

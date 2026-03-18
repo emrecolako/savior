@@ -58,6 +58,7 @@ export {
   classifySourceType,
   isOutdated,
   annotateSourceMetadata,
+  generateVariantLinks,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,
