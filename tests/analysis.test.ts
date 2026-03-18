@@ -549,6 +549,32 @@ describe("Drug-gene interaction matrix", () => {
     expect(clopidogrel!.action).toBe("use alternative");
   });
 
+  it("detects CYP2C19 ultra-rapid metabolizer from *17/*17", () => {
+    // rs12248560 TT = CYP2C19*17 homozygous
+    const data = `# test\nrs12248560\t10\t96541616\tTT\n`;
+    const path = join(TMP, "pgx-um.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    const cyp2c19 = matrix.genes.find((g) => g.gene === "CYP2C19")!;
+    expect(["rapid", "ultra-rapid"]).toContain(cyp2c19.phenotype);
+    expect(cyp2c19.activityScore).toBeGreaterThan(2);
+  });
+
+  it("handles CYP1A2 rapid metabolizer", () => {
+    // rs762551 AA = CYP1A2*1F homozygous (increased activity)
+    const data = `# test\nrs762551\t15\t75041917\tAA\n`;
+    const path = join(TMP, "pgx-1a2.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const matrix = buildDrugGeneMatrix(genome, []);
+
+    const cyp1a2 = matrix.genes.find((g) => g.gene === "CYP1A2")!;
+    // AA = two increased-function alleles
+    expect(["rapid", "ultra-rapid"]).toContain(cyp1a2.phenotype);
+  });
+
   it("groups interactions by drug class", () => {
     const genome = makeTestGenome();
     const variants = crossReference(genome, TEST_DB);
