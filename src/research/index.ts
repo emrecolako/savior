@@ -362,12 +362,17 @@ export class PubMedProvider implements ResearchProviderImpl {
       const authorsText = authors ? `${authors}${article.authors?.length > 3 ? " et al." : ""}` : "";
       const summary = authorsText ? `${authorsText}. ${title}` : title;
 
+      // Check for PMC full-text availability
+      const pmcid = article.articleids?.find((id: any) => id.idtype === "pmc")?.value;
+      const pmcUrl = pmcid ? `https://www.ncbi.nlm.nih.gov/pmc/articles/${pmcid}/` : undefined;
+
       results.push({
         title,
         source: article.source ?? "Unknown journal",
         url: `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
         date: article.pubdate ?? "Unknown date",
         summary,
+        pmcUrl,
       });
 
       // Stop once we have enough deduplicated results

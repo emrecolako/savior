@@ -105,6 +105,43 @@ describe("PubMedProvider", () => {
     expect(findings[1].source).toBe("Lancet Neurol");
   });
 
+  it("extracts PMC URL when pmcid is available", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ esearchresult: { idlist: ["99001"] } }) });
+      }
+      if (urlStr.includes("esummary.fcgi")) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({
+            result: {
+              "99001": {
+                title: "Open access paper",
+                source: "PLoS Genet",
+                pubdate: "2025",
+                articleids: [
+                  { idtype: "pubmed", value: "99001" },
+                  { idtype: "pmc", value: "PMC1234567" },
+                ],
+              },
+            },
+          }),
+        });
+      }
+      // efetch returns empty XML
+      if (urlStr.includes("efetch.fcgi")) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve("") });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 3);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].pmcUrl).toBe("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1234567/");
+  });
+
   it("returns empty array when no PMIDs found", async () => {
     vi.stubGlobal("fetch", () =>
       Promise.resolve({

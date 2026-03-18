@@ -110,6 +110,7 @@ export interface ResearchFinding {
   date: string;
   summary: string;
   evidenceDirection?: EvidenceDirection;  // auto-classified direction of evidence
+  pmcUrl?: string;                 // PMC full-text URL if available
 }
 
 export interface ApoeGenotype {
