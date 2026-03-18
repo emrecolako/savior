@@ -3,7 +3,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
-import { crossReference, determineApoe, detectPathways } from "../src/analysis/engine.js";
+import { crossReference, determineApoe, detectPathways, analyse } from "../src/analysis/engine.js";
 import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
 import { loadDatabase } from "../src/database/loader.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
@@ -305,6 +305,34 @@ describe("Integration: large database cross-reference", () => {
       const curr = severityRank[variants[i].severity] ?? 99;
       expect(prev).toBeLessThanOrEqual(curr);
     }
+  });
+});
+
+describe("Full analysis pipeline", () => {
+  it("runs analyse() end-to-end with test genome", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB, { input: { filePath: "test.txt" } });
+
+    expect(result.inputFormat).toBe("23andme");
+    expect(result.totalSnps).toBeGreaterThan(0);
+    expect(result.matchedCount).toBe(4);
+    expect(result.apoe.diplotype).toBe("e3/e3");
+    expect(result.variants.length).toBe(4);
+    expect(result.pathways.length).toBeGreaterThan(0);
+    expect(result.pharmacogenomics.genes.length).toBe(11);
+    expect(result.pharmacogenomics.interactions.length).toBeGreaterThan(0);
+    expect(result.executiveSummary).toBeDefined();
+  });
+
+  it("generates executive summary bullets", () => {
+    const genome = makeTestGenome();
+    const result = analyse(genome, TEST_DB);
+    
+    // With CYP2C9*2 pharmacogenomics variant, should mention it
+    const hasPharma = result.executiveSummary?.some((b) =>
+      b.toLowerCase().includes("pharmacogenomic")
+    );
+    expect(hasPharma).toBe(true);
   });
 });
 
