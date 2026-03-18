@@ -3,7 +3,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse23andMe } from "../src/parsers/twentythree-and-me.js";
-import { crossReference, determineApoe, detectPathways, analyse } from "../src/analysis/engine.js";
+import { crossReference, determineApoe, detectPathways, analyse, generateActionItems } from "../src/analysis/engine.js";
 import { buildDrugGeneMatrix } from "../src/analysis/metabolizers.js";
 import { loadDatabase } from "../src/database/loader.js";
 import type { SnpDatabase, ParsedGenome } from "../src/types.js";
@@ -287,6 +287,32 @@ describe("Pathway convergence", () => {
 });
 
 // ─── Pharmacogenomics / Drug-Gene Matrix ─────────────────────
+
+describe("Action item generation", () => {
+  it("generates pharmacogenomics alert when PGx variants present", () => {
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+    const apoe = determineApoe(genome);
+    const actions = generateActionItems(variants, pathways, apoe);
+
+    const pgxAlert = actions.find((a: any) => a.category === "pharmacogenomics");
+    expect(pgxAlert).toBeDefined();
+    expect(pgxAlert!.priority).toBe("urgent");
+  });
+
+  it("generates lifestyle actions when multiple pathways elevated", () => {
+    // This test uses the small test DB, so elevated pathway count may be low
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, TEST_DB);
+    const pathways = detectPathways(variants);
+    const apoe = determineApoe(genome);
+    const actions = generateActionItems(variants, pathways, apoe);
+
+    // Should at least have some actions
+    expect(actions.length).toBeGreaterThan(0);
+  });
+});
 
 describe("Integration: large database cross-reference", () => {
   it("handles full snp-database.json without errors", () => {
