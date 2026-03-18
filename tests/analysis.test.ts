@@ -406,6 +406,25 @@ describe("Database filtering", () => {
 });
 
 describe("Integration: large database cross-reference", () => {
+  it("detects pathways from full database", () => {
+    const genome = makeTestGenome();
+    const fullDb = loadDatabase();
+    const variants = crossReference(genome, fullDb);
+    const pathways = detectPathways(variants);
+
+    // Should detect at least some pathways from a full database
+    expect(pathways.length).toBeGreaterThan(0);
+
+    // All pathways should have valid structure
+    for (const p of pathways) {
+      expect(p.name).toBeTruthy();
+      expect(p.slug).toBeTruthy();
+      expect(p.synergyScore).toBeGreaterThanOrEqual(0);
+      expect(p.synergyScore).toBeLessThanOrEqual(100);
+      expect(p.involvedGenes.length).toBeGreaterThan(0);
+    }
+  });
+
   it("handles full snp-database.json without errors", () => {
     const genome = makeTestGenome();
     const fullDb = loadDatabase();
