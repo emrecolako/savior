@@ -113,6 +113,40 @@ describe("Cross-reference engine", () => {
     expect(apoe429.riskAlleleCount).toBe(0);
   });
 
+  it("handles no-call genotypes (-- and 00)", () => {
+    const data = `# test\nrs429358\t19\t45411941\t--\nrs7412\t19\t45412079\t00\nrs4680\t22\t19951271\tAA\n`;
+    const path = join(TMP, "nocall-test.txt");
+    writeFileSync(path, data);
+    const genome = parse23andMe(path);
+    const variants = crossReference(genome, TEST_DB);
+    // Only rs4680 should match (rs429358 and rs7412 are no-calls)
+    expect(variants.find((v) => v.rsid === "rs429358")).toBeUndefined();
+    expect(variants.find((v) => v.rsid === "rs7412")).toBeUndefined();
+    expect(variants.find((v) => v.rsid === "rs4680")).toBeDefined();
+  });
+
+  it("correctly handles 'varies' risk allele", () => {
+    const db: SnpDatabase = {
+      version: "test",
+      lastUpdated: "2026-01-01",
+      entries: [{
+        rsid: "rs4680",
+        gene: "COMT",
+        riskAllele: "varies",
+        condition: "COMT — variable effect",
+        category: "pharmacogenomics",
+        severity: "moderate",
+        evidenceLevel: "GWAS",
+        notes: "Complex.",
+      }],
+    };
+    const genome = makeTestGenome();
+    const variants = crossReference(genome, db);
+    const comt = variants.find((v) => v.rsid === "rs4680");
+    expect(comt).toBeDefined();
+    expect(comt!.riskAlleleCount).toBe(-1); // undetermined
+  });
+
   it("sorts results by severity", () => {
     const genome = makeTestGenome();
     const variants = crossReference(genome, TEST_DB);
