@@ -53,6 +53,7 @@ export {
   createResearchConfig,
   prioritizeForResearch,
   researchLandscapeOverview,
+  findResearchGaps,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,

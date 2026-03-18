@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview, findResearchGaps } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -925,6 +925,22 @@ describe("Research persistence", () => {
   it("returns false when file doesn't exist", () => {
     const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
     expect(loaded).toBe(false);
+  });
+});
+
+describe("findResearchGaps", () => {
+  it("identifies high-priority variants without research", () => {
+    const variants = [
+      makeVariant({ rsid: "rs1", severity: "critical", riskAlleleCount: 1, recentFindings: [] }),
+      makeVariant({ rsid: "rs2", severity: "critical", riskAlleleCount: 1, recentFindings: [
+        { title: "P", source: "J", url: "", date: "2025", summary: "" },
+      ]}),
+      makeVariant({ rsid: "rs3", severity: "high", riskAlleleCount: 2 }), // no findings
+      makeVariant({ rsid: "rs4", severity: "moderate", riskAlleleCount: 1 }), // not high priority
+    ];
+    const gaps = findResearchGaps(variants);
+    expect(gaps.length).toBe(2); // rs1 (empty findings) and rs3 (undefined)
+    expect(gaps.map((v) => v.rsid).sort()).toEqual(["rs1", "rs3"]);
   });
 });
 

@@ -906,6 +906,21 @@ export function researchLandscapeOverview(
   return parts.join(" ");
 }
 
+/**
+ * Identify variants that have high clinical significance but lack research coverage.
+ * Useful for flagging knowledge gaps in the analysis.
+ */
+export function findResearchGaps(variants: MatchedVariant[]): MatchedVariant[] {
+  return variants.filter((v) => {
+    const isHighPriority =
+      v.riskAlleleCount > 0 &&
+      (v.severity === "critical" || v.severity === "high");
+    const lacksResearch =
+      !v.recentFindings || v.recentFindings.length === 0;
+    return isHighPriority && lacksResearch;
+  });
+}
+
 // ─── Config helpers ─────────────────────────────────────────────
 
 /**
