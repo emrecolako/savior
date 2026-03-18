@@ -1,12 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-# Pre-check: TypeScript compilation
-npx tsc --noEmit 2>&1 | tail -5
-if [ ${PIPESTATUS[0]} -ne 0 ]; then
-  echo "METRIC total_ms=0"
-  echo "METRIC test_count=0"
-  exit 1
+# Quick type check — only if src/ changed since last check
+NEED_TSC=0
+if [ ! -f .tsc-stamp ]; then
+  NEED_TSC=1
+elif [ -n "$(find src/ -name '*.ts' -newer .tsc-stamp 2>/dev/null | head -1)" ]; then
+  NEED_TSC=1
+fi
+
+if [ "$NEED_TSC" -eq 1 ]; then
+  npx tsc --noEmit 2>&1 | tail -5
+  if [ ${PIPESTATUS[0]} -ne 0 ]; then
+    echo "METRIC total_ms=0"
+    echo "METRIC test_count=0"
+    exit 1
+  fi
+  touch .tsc-stamp
 fi
 
 # Run tests and capture timing
