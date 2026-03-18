@@ -105,6 +105,36 @@ describe("PubMedProvider", () => {
     expect(findings[1].source).toBe("Lancet Neurol");
   });
 
+  it("fetches and populates abstracts from efetch", async () => {
+    const mockXml = `<PubmedArticleSet>
+<PubmedArticle><MedlineCitation><PMID>39000001</PMID><Article><Abstract>
+<AbstractText>This is the abstract for the first paper about APOE.</AbstractText>
+</Abstract></Article></MedlineCitation></PubmedArticle>
+</PubmedArticleSet>`;
+
+    vi.stubGlobal("fetch", (url: string) => {
+      const urlStr = typeof url === "string" ? url : url.toString();
+      if (urlStr.includes("esearch.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESEARCH_RESPONSE) });
+      }
+      if (urlStr.includes("esummary.fcgi")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(MOCK_ESUMMARY_RESPONSE) });
+      }
+      if (urlStr.includes("efetch.fcgi")) {
+        return Promise.resolve({ ok: true, text: () => Promise.resolve(mockXml) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    });
+
+    const provider = new PubMedProvider();
+    const findings = await provider.search(makeVariant(), 3, 2024);
+    expect(findings.length).toBeGreaterThan(0);
+    // First finding should have abstract populated
+    const first = findings.find((f) => f.url.includes("39000001"));
+    expect(first).toBeDefined();
+    expect(first!.summary).toContain("abstract for the first paper");
+  });
+
   it("extracts PMC URL when pmcid is available", async () => {
     vi.stubGlobal("fetch", (url: string) => {
       const urlStr = typeof url === "string" ? url : url.toString();
