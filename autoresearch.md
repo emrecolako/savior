@@ -80,7 +80,15 @@ Optimize the genomic-report research module and overall test suite for speed and
 30. **Research gaps detection** — Identifies high-priority variants without research
 31. **Abstract fetch test** — End-to-end efetch XML → summary population
 
+32. **Findings merger** — Deduplicates by title, keeps richer summaries, preserves PMC URLs
+33. **Research gap detection** — Identifies high-priority variants lacking research
+34. **APOE genotype tests** — e3/e4, e4/e4, e2/e3 diplotype validation
+35. **Cross-reference edge cases** — No-call filtering, 'varies' risk allele handling
+36. **Progress callback test** — Validates onProgress during cross-reference
+37. **Analysis filter test** — risk-alleles-only filter configuration
+38. **Metabolizer tests** — CYP2C19 rapid, CYP1A2 rapid phenotype detection
+
 ### Current State
-- 119 tests, ~190-220ms (97%+ faster than baseline of 7540ms)  
-- Tests more than doubled (+105%)
-- Full research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summaries, clinical trials, persistence, rate limiting, timeouts, PMC links, prioritization, research gaps, landscape overview
+- 132 tests, ~200-225ms (97%+ faster than baseline of 7540ms)
+- Tests more than doubled (+128%)
+- Full research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summaries, clinical trials, persistence, rate limiting, timeouts, PMC links, prioritization, research gaps, landscape overview, findings merger
