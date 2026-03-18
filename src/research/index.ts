@@ -860,6 +860,52 @@ export function prioritizeForResearch(variants: MatchedVariant[]): MatchedVarian
     });
 }
 
+// ─── Research landscape summary ─────────────────────────────────
+
+/**
+ * Generate a one-paragraph research landscape overview suitable
+ * for inclusion in an executive summary or report header.
+ */
+export function researchLandscapeOverview(
+  variants: MatchedVariant[],
+  trials?: ClinicalTrial[]
+): string {
+  const withFindings = variants.filter((v) => v.recentFindings && v.recentFindings.length > 0);
+  const totalFindings = withFindings.reduce((sum, v) => sum + (v.recentFindings?.length ?? 0), 0);
+
+  if (totalFindings === 0 && (!trials || trials.length === 0)) {
+    return "No research enrichment was performed for this analysis.";
+  }
+
+  const parts: string[] = [];
+
+  if (totalFindings > 0) {
+    const genes = [...new Set(withFindings.map((v) => v.gene))];
+    const pmcCount = withFindings.reduce(
+      (sum, v) => sum + (v.recentFindings?.filter((f) => f.pmcUrl).length ?? 0), 0
+    );
+
+    parts.push(
+      `Literature search identified ${totalFindings} relevant publication${totalFindings !== 1 ? "s" : ""} ` +
+      `across ${genes.length} gene${genes.length !== 1 ? "s" : ""} (${genes.slice(0, 5).join(", ")}${genes.length > 5 ? ` and ${genes.length - 5} more` : ""}).`
+    );
+
+    if (pmcCount > 0) {
+      parts.push(`${pmcCount} paper${pmcCount !== 1 ? "s" : ""} available as open-access full text via PMC.`);
+    }
+  }
+
+  if (trials && trials.length > 0) {
+    const recruiting = trials.filter((t) => t.status === "RECRUITING").length;
+    parts.push(
+      `${trials.length} active clinical trial${trials.length !== 1 ? "s" : ""} found` +
+      (recruiting > 0 ? ` (${recruiting} currently recruiting).` : ".")
+    );
+  }
+
+  return parts.join(" ");
+}
+
 // ─── Config helpers ─────────────────────────────────────────────
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief, createResearchConfig, prioritizeForResearch, researchLandscapeOverview } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -895,6 +895,33 @@ describe("Research persistence", () => {
   it("returns false when file doesn't exist", () => {
     const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
     expect(loaded).toBe(false);
+  });
+});
+
+describe("Research landscape overview", () => {
+  it("generates overview with papers and trials", () => {
+    const variants = [
+      makeVariant({
+        gene: "APOE", recentFindings: [
+          { title: "P1", source: "J1", url: "", date: "2025", summary: "" },
+          { title: "P2", source: "J2", url: "", date: "2025", summary: "", pmcUrl: "https://pmc/1" },
+        ],
+      }),
+    ];
+    const trials = [
+      { nctId: "NCT1", title: "Trial", status: "RECRUITING", phase: "PHASE3", conditions: [], interventions: [], url: "" },
+    ];
+    const overview = researchLandscapeOverview(variants, trials);
+    expect(overview).toContain("2 relevant publications");
+    expect(overview).toContain("APOE");
+    expect(overview).toContain("1 paper available as open-access");
+    expect(overview).toContain("1 active clinical trial");
+    expect(overview).toContain("1 currently recruiting");
+  });
+
+  it("returns fallback when no enrichment", () => {
+    const overview = researchLandscapeOverview([makeVariant()]);
+    expect(overview).toContain("No research enrichment");
   });
 });
 

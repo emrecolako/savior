@@ -52,6 +52,7 @@ export {
   variantResearchBrief,
   createResearchConfig,
   prioritizeForResearch,
+  researchLandscapeOverview,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,
