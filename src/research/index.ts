@@ -585,12 +585,36 @@ export function generateResearchSummary(variants: MatchedVariant[]): string {
     geneFindings.set(v.gene, group);
   }
 
+  // Evidence direction breakdown
+  const allFindings = variantsWithFindings.flatMap((v) => v.recentFindings ?? []);
+  const directionCounts = {
+    "supports-risk": 0,
+    protective: 0,
+    neutral: 0,
+    uncertain: 0,
+  };
+  for (const f of allFindings) {
+    if (f.evidenceDirection) {
+      directionCounts[f.evidenceDirection]++;
+    }
+  }
+
+  const directionParts: string[] = [];
+  if (directionCounts["supports-risk"] > 0) directionParts.push(`${directionCounts["supports-risk"]} supporting risk`);
+  if (directionCounts.protective > 0) directionParts.push(`${directionCounts.protective} protective`);
+  if (directionCounts.neutral > 0) directionParts.push(`${directionCounts.neutral} neutral`);
+  if (directionCounts.uncertain > 0) directionParts.push(`${directionCounts.uncertain} uncertain`);
+  if (directionParts.length > 0) {
+    lines.push(`Evidence direction: ${directionParts.join(", ")}.`);
+  }
+
   for (const [gene, { variants: geneVariants, findings }] of geneFindings) {
     const rsids = [...new Set(geneVariants.map((v) => v.rsid))].join(", ");
     const topFinding = findings[0]; // Already sorted by relevance
     if (topFinding) {
+      const dirTag = topFinding.evidenceDirection ? ` [${topFinding.evidenceDirection}]` : "";
       lines.push(
-        `**${gene}** (${rsids}): "${topFinding.title}" (${topFinding.source}, ${topFinding.date}).`
+        `**${gene}** (${rsids}): "${topFinding.title}" (${topFinding.source}, ${topFinding.date})${dirTag}.`
       );
     }
   }

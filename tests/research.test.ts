@@ -557,13 +557,13 @@ describe("Research summary generation", () => {
       makeVariant({
         rsid: "rs1", gene: "APOE",
         recentFindings: [
-          { title: "APOE Paper", source: "Nature", url: "", date: "2025", summary: "" },
+          { title: "APOE Paper", source: "Nature", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
         ],
       }),
       makeVariant({
         rsid: "rs2", gene: "BRCA2",
         recentFindings: [
-          { title: "BRCA2 Paper", source: "Science", url: "", date: "2025", summary: "" },
+          { title: "BRCA2 Paper", source: "Science", url: "", date: "2025", summary: "", evidenceDirection: "protective" },
         ],
       }),
     ];
@@ -572,6 +572,8 @@ describe("Research summary generation", () => {
     expect(summary).toContain("2 variants");
     expect(summary).toContain("APOE");
     expect(summary).toContain("BRCA2");
+    expect(summary).toContain("1 supporting risk");
+    expect(summary).toContain("1 protective");
   });
 
   it("returns fallback message when no findings", () => {

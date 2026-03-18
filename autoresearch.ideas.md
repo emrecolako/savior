@@ -3,12 +3,15 @@
 ## Done
 - [x] ~~Implement Exa provider~~
 - [x] ~~Multi-provider fallback~~
+- [x] ~~Evidence direction classification~~
+- [x] ~~Rate limiter with token bucket~~
+- [x] ~~Clinical trials search (ClinicalTrials.gov)~~
+- [x] ~~Research result persistence~~
+- [x] ~~Vitest parallel config optimization~~
 
-## Next Up
-- [ ] Add variant-specific evidence grading — classify findings as "supports risk", "protective", "neutral"
-- [ ] Rate limiter class with token bucket — cleaner NCBI rate limiting, replace raw sleep()
-- [ ] Add clinical trial search via ClinicalTrials.gov API for actionable trials per variant
+## Remaining
 - [ ] Fetch full-text from PMC Open Access for richer summaries (check pmcid in esummary)
-- [ ] Optimize vitest config — pool threads, isolate false, reduce transform overhead (~130ms)
 - [ ] Add integration test with real snp-database.json (larger cross-reference coverage)
-- [ ] Research result persistence — save/load findings to JSON alongside report
+- [ ] Optimize tsc --noEmit pre-check (~0.8s overhead per run, not in metric but in wall time)
+- [ ] Add research enrichment to generateResearchSummary — include evidence direction counts
+- [ ] PMC link extraction — when efetch returns PMCID, generate PMC URL for free full text
