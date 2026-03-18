@@ -8,10 +8,12 @@
 - [x] ~~Clinical trials search (ClinicalTrials.gov)~~
 - [x] ~~Research result persistence~~
 - [x] ~~Vitest parallel config optimization~~
+- [x] ~~PMC link extraction~~
+- [x] ~~Integration test with real snp-database.json~~
+- [x] ~~Research summary with evidence breakdown~~
 
-## Remaining
-- [ ] Fetch full-text from PMC Open Access for richer summaries (check pmcid in esummary)
-- [ ] Add integration test with real snp-database.json (larger cross-reference coverage)
-- [ ] Optimize tsc --noEmit pre-check (~0.8s overhead per run, not in metric but in wall time)
-- [ ] Add research enrichment to generateResearchSummary — include evidence direction counts
-- [ ] PMC link extraction — when efetch returns PMCID, generate PMC URL for free full text
+## Remaining (low priority / diminishing returns)
+- [ ] Add MeSH term enrichment — map gene names to MeSH ontology (complex, marginal benefit)
+- [ ] PMC full-text fetching — download and parse PMC XML for complete summaries
+- [ ] Research trending detector — identify genes with surging publication counts
+- [ ] Multi-ancestry population params for PRS scoring

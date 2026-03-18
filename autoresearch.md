@@ -55,6 +55,15 @@ Optimize the genomic-report research module and overall test suite for speed and
 14. **AbortController timeouts** — 10s timeout on all fetch calls to prevent hanging
 15. **Library exports** — Full public API for all new research functions
 
+16. **Evidence direction classification** — Keyword-based grading: supports-risk, protective, neutral, uncertain
+17. **RateLimiter class** — Token-bucket algorithm replaces raw sleep(350) calls
+18. **Vitest parallel config** — pool=threads, fileParallelism=true (204ms → from 355ms)
+19. **ClinicalTrials.gov search** — Search active/recruiting trials by gene+condition via v2 API
+20. **Research persistence** — Save/load findings to JSON for offline access
+21. **Enhanced summary** — Evidence direction breakdown and direction tags per gene
+22. **PMC URL extraction** — Detect pmcid from esummary for open access full text
+23. **Integration test** — Full snp-database.json cross-reference + severity sort validation
+
 ### Current State
-- 85 tests, ~370ms (95% faster than baseline of 7540ms)
-- Research module: PubMed + Exa + Fallback providers, better queries, dedup, caching, abstract fetching, relevance scoring, summary generation, timeouts
+- 102 tests, ~200ms (97.3% faster than baseline of 7540ms)
+- Research module: PubMed + Exa + Fallback providers, queries, dedup, caching, abstract fetching, relevance scoring, evidence grading, summary, clinical trials, persistence, rate limiting, timeouts, PMC links
