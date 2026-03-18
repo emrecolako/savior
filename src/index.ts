@@ -49,6 +49,8 @@ export {
   classifyEvidenceDirection,
   annotateEvidenceDirection,
   searchClinicalTrials,
+  saveResearchFindings,
+  loadResearchFindings,
   RateLimiter,
   PubMedProvider,
   ExaProvider,

@@ -654,6 +654,76 @@ export async function searchClinicalTrials(
   }
 }
 
+// ─── Research result persistence ────────────────────────────────
+
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+
+interface PersistedResearch {
+  version: string;
+  savedAt: string;
+  variantFindings: Array<{
+    rsid: string;
+    gene: string;
+    findings: ResearchFinding[];
+  }>;
+  clinicalTrials?: ClinicalTrial[];
+}
+
+/**
+ * Save research findings to a JSON file for offline access.
+ */
+export function saveResearchFindings(
+  variants: MatchedVariant[],
+  outputPath: string,
+  clinicalTrials?: ClinicalTrial[]
+): void {
+  const data: PersistedResearch = {
+    version: "1.0",
+    savedAt: new Date().toISOString(),
+    variantFindings: variants
+      .filter((v) => v.recentFindings && v.recentFindings.length > 0)
+      .map((v) => ({
+        rsid: v.rsid,
+        gene: v.gene,
+        findings: v.recentFindings!,
+      })),
+    clinicalTrials,
+  };
+
+  writeFileSync(outputPath, JSON.stringify(data, null, 2));
+}
+
+/**
+ * Load previously saved research findings and apply them to variants.
+ * Returns true if findings were loaded, false if file doesn't exist.
+ */
+export function loadResearchFindings(
+  variants: MatchedVariant[],
+  inputPath: string
+): boolean {
+  if (!existsSync(inputPath)) return false;
+
+  try {
+    const raw = readFileSync(inputPath, "utf-8");
+    const data: PersistedResearch = JSON.parse(raw);
+
+    const findingsMap = new Map(
+      data.variantFindings.map((vf) => [vf.rsid, vf.findings])
+    );
+
+    for (const v of variants) {
+      const saved = findingsMap.get(v.rsid);
+      if (saved) {
+        v.recentFindings = saved;
+      }
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Provider registry ──────────────────────────────────────────
 
 const PROVIDERS: Record<string, new (...args: any[]) => ResearchProviderImpl> = {

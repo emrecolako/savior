@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings } from "../src/research/index.js";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { mkdirSync, unlinkSync } from "node:fs";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -723,6 +726,45 @@ describe("enrichWithResearch edge cases", () => {
     });
     expect(variants[0].recentFindings).toBeUndefined();
     expect(variants[1].recentFindings).toBeUndefined();
+  });
+});
+
+describe("Research persistence", () => {
+  const TMP = join(tmpdir(), "genomic-report-research-test");
+  try { mkdirSync(TMP, { recursive: true }); } catch {}
+
+  it("saves and loads research findings", () => {
+    const filePath = join(TMP, "test-findings.json");
+    const variants = [
+      makeVariant({
+        rsid: "rs1",
+        gene: "APOE",
+        recentFindings: [
+          { title: "Paper 1", source: "Nature", url: "https://example.com/1", date: "2025", summary: "Summary 1", evidenceDirection: "supports-risk" },
+        ],
+      }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2" }), // no findings
+    ];
+
+    saveResearchFindings(variants, filePath);
+
+    // Load into fresh variants
+    const freshVariants = [
+      makeVariant({ rsid: "rs1", gene: "APOE" }),
+      makeVariant({ rsid: "rs2", gene: "BRCA2" }),
+    ];
+    const loaded = loadResearchFindings(freshVariants, filePath);
+    expect(loaded).toBe(true);
+    expect(freshVariants[0].recentFindings).toHaveLength(1);
+    expect(freshVariants[0].recentFindings![0].title).toBe("Paper 1");
+    expect(freshVariants[1].recentFindings).toBeUndefined();
+
+    try { unlinkSync(filePath); } catch {}
+  });
+
+  it("returns false when file doesn't exist", () => {
+    const loaded = loadResearchFindings([makeVariant()], "/nonexistent/path.json");
+    expect(loaded).toBe(false);
   });
 });
 
