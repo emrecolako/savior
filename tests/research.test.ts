@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -177,6 +177,29 @@ describe("enrichWithResearch", () => {
     // First variant fails gracefully after all retries, second succeeds
     expect(variants[0].recentFindings).toEqual([]);
     expect(variants[1].recentFindings!.length).toBeGreaterThan(0);
+  });
+});
+
+describe("RateLimiter", () => {
+  it("allows immediate acquisition when tokens are available", async () => {
+    const limiter = new RateLimiter(10);
+    const start = Date.now();
+    await limiter.acquire();
+    await limiter.acquire();
+    await limiter.acquire();
+    // Should be near-instant with sleep mocked
+    expect(Date.now() - start).toBeLessThan(50);
+  });
+
+  it("resets to full capacity", async () => {
+    const limiter = new RateLimiter(2);
+    await limiter.acquire();
+    await limiter.acquire();
+    limiter.reset();
+    // Should have tokens again after reset
+    const start = Date.now();
+    await limiter.acquire();
+    expect(Date.now() - start).toBeLessThan(50);
   });
 });
 

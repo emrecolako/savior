@@ -112,6 +112,59 @@ export function extractAbstractFromXml(xml: string): string {
     .join(" ");
 }
 
+// ─── Rate limiter ───────────────────────────────────────────────
+
+/**
+ * Token-bucket rate limiter for API calls.
+ * Ensures we don't exceed a maximum number of requests per second.
+ */
+export class RateLimiter {
+  private tokens: number;
+  private maxTokens: number;
+  private refillRateMs: number; // ms per token refill
+  private lastRefill: number;
+
+  /**
+   * @param maxRequestsPerSecond - Maximum requests per second (e.g., 3 for NCBI without key, 10 with)
+   */
+  constructor(maxRequestsPerSecond: number) {
+    this.maxTokens = maxRequestsPerSecond;
+    this.tokens = maxRequestsPerSecond;
+    this.refillRateMs = 1000 / maxRequestsPerSecond;
+    this.lastRefill = Date.now();
+  }
+
+  /** Wait until a token is available, then consume it. */
+  async acquire(): Promise<void> {
+    this.refill();
+    if (this.tokens >= 1) {
+      this.tokens -= 1;
+      return;
+    }
+    // Wait for next token
+    const waitMs = this.refillRateMs - (Date.now() - this.lastRefill);
+    if (waitMs > 0) {
+      await sleep(waitMs);
+    }
+    this.refill();
+    this.tokens = Math.max(0, this.tokens - 1);
+  }
+
+  private refill(): void {
+    const now = Date.now();
+    const elapsed = now - this.lastRefill;
+    const newTokens = elapsed / this.refillRateMs;
+    this.tokens = Math.min(this.maxTokens, this.tokens + newTokens);
+    this.lastRefill = now;
+  }
+
+  /** Reset the limiter to full capacity. */
+  reset(): void {
+    this.tokens = this.maxTokens;
+    this.lastRefill = Date.now();
+  }
+}
+
 // ─── Provider interface ─────────────────────────────────────────
 
 export interface ResearchProviderImpl {
@@ -224,9 +277,12 @@ export class PubMedProvider implements ResearchProviderImpl {
   name = "pubmed";
   private apiKey?: string;
   private cache = new Map<string, ResearchFinding[]>();
+  private limiter: RateLimiter;
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey;
+    // NCBI: 3 req/s without key, 10 req/s with key
+    this.limiter = new RateLimiter(apiKey ? 10 : 3);
   }
 
   /** Clear the in-memory cache. */
@@ -281,7 +337,7 @@ export class PubMedProvider implements ResearchProviderImpl {
     const pmids: string[] = searchData?.esearchresult?.idlist ?? [];
     if (pmids.length === 0) return [];
 
-    await sleep(350); // NCBI rate limit: 3 req/s without API key
+    await this.limiter.acquire();
 
     let summaryUrl = `${BASE}/esummary.fcgi?db=pubmed&id=${pmids.join(",")}&retmode=json`;
     if (this.apiKey) summaryUrl += `&api_key=${this.apiKey}`;
@@ -320,7 +376,7 @@ export class PubMedProvider implements ResearchProviderImpl {
 
     // Optionally fetch abstracts for top results (richer summaries)
     if (results.length > 0) {
-      await sleep(350);
+      await this.limiter.acquire();
       try {
         const topPmids = results
           .map((r) => r.url.match(/\/(\d+)\/$/)?.[1])
@@ -353,7 +409,7 @@ export class PubMedProvider implements ResearchProviderImpl {
       }
     }
 
-    await sleep(350);
+    await this.limiter.acquire();
 
     // Sort by relevance score (highest first)
     const sorted = results.sort((a, b) => scoreRelevance(b, variant) - scoreRelevance(a, variant));
