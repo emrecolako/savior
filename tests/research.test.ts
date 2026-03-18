@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, enrichWithResearch } from "../src/research/index.js";
+import { PubMedProvider, enrichWithResearch, setSleep, resetSleep } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -64,9 +64,11 @@ function mockFetch(url: string | URL | Request) {
 beforeEach(() => {
   fetchCalls = [];
   vi.stubGlobal("fetch", mockFetch);
+  setSleep(() => Promise.resolve()); // Skip real delays in tests
 });
 
 afterEach(() => {
+  resetSleep();
   vi.restoreAllMocks();
 });
 

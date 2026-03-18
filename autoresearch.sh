@@ -13,11 +13,16 @@ fi
 OUTPUT=$(npx vitest run 2>&1)
 echo "$OUTPUT" | tail -20
 
-# Extract duration in ms
+# Extract duration - handles both "7.54s" and "392ms" formats
 DURATION_LINE=$(echo "$OUTPUT" | grep "Duration")
-# Duration format: "Duration  7.55s (transform ...)"
-DURATION_S=$(echo "$DURATION_LINE" | grep -oE '[0-9]+\.[0-9]+s' | head -1 | sed 's/s//')
-DURATION_MS=$(echo "$DURATION_S * 1000" | bc | cut -d. -f1)
+if echo "$DURATION_LINE" | grep -qE '[0-9]+\.[0-9]+s'; then
+  DURATION_S=$(echo "$DURATION_LINE" | grep -oE '[0-9]+\.[0-9]+s' | head -1 | sed 's/s//')
+  DURATION_MS=$(echo "$DURATION_S * 1000" | bc | cut -d. -f1)
+elif echo "$DURATION_LINE" | grep -qE '[0-9]+ms'; then
+  DURATION_MS=$(echo "$DURATION_LINE" | grep -oE '[0-9]+ms' | head -1 | sed 's/ms//')
+else
+  DURATION_MS=0
+fi
 
 # Extract test count
 TESTS_LINE=$(echo "$OUTPUT" | grep "Tests")

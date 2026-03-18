@@ -19,7 +19,19 @@ import type { MatchedVariant, ResearchFinding, ResearchConfig } from "../types.j
 
 // ─── Helpers ────────────────────────────────────────────────────
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+let _sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Override the internal sleep function (useful for testing). */
+export function setSleep(fn: (ms: number) => Promise<void>) {
+  _sleep = fn;
+}
+
+/** Reset sleep to the default implementation. */
+export function resetSleep() {
+  _sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+}
+
+const sleep = (ms: number) => _sleep(ms);
 
 async function fetchWithRetry(url: string, retries = 2): Promise<any> {
   for (let attempt = 0; attempt <= retries; attempt++) {

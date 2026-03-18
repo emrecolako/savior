@@ -1,1 +1,2 @@
 {"type":"config","name":"Optimize genomic-report research module & test suite","metricName":"total_ms","metricUnit":"ms","bestDirection":"lower"}
+{"run":1,"commit":"5ab276d","metric":7540,"metrics":{"test_count":58},"status":"keep","description":"Baseline: 7540ms total, 58 tests. Research tests = 7250ms due to unmocked sleep(350) calls","timestamp":1773846363525,"segment":0}
