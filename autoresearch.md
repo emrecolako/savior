@@ -51,6 +51,10 @@ Optimize the genomic-report research module and overall test suite for speed and
 11. **Research summary generator** — Generates cohesive narrative from findings, grouped by gene
 12. **Library exports** — All new functions properly exported from index.ts
 
+13. **FallbackProvider** — Composite provider with automatic fallback from primary to secondary
+14. **AbortController timeouts** — 10s timeout on all fetch calls to prevent hanging
+15. **Library exports** — Full public API for all new research functions
+
 ### Current State
-- 81 tests, ~370ms (95% faster than baseline of 7540ms)
-- Research module: PubMed + Exa providers, better queries, dedup, caching, abstract fetching, relevance scoring, summary generation
+- 85 tests, ~370ms (95% faster than baseline of 7540ms)
+- Research module: PubMed + Exa + Fallback providers, better queries, dedup, caching, abstract fetching, relevance scoring, summary generation, timeouts
