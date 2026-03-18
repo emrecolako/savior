@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, FallbackProvider, RateLimiter, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary, classifyEvidenceDirection, annotateEvidenceDirection, searchClinicalTrials, saveResearchFindings, loadResearchFindings, variantResearchBrief } from "../src/research/index.js";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { mkdirSync, unlinkSync } from "node:fs";
@@ -765,6 +765,41 @@ describe("enrichWithResearch edge cases", () => {
     });
     expect(variants[0].recentFindings).toBeUndefined();
     expect(variants[1].recentFindings).toBeUndefined();
+  });
+});
+
+describe("Variant research brief", () => {
+  it("generates brief with evidence direction and top paper", () => {
+    const variant = makeVariant({
+      rsid: "rs429358", gene: "APOE",
+      recentFindings: [
+        { title: "APOE risk meta-analysis", source: "Nat Genet", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
+        { title: "Another paper", source: "Science", url: "", date: "2025", summary: "", evidenceDirection: "supports-risk" },
+      ],
+    });
+    const brief = variantResearchBrief(variant);
+    expect(brief).toContain("APOE (rs429358)");
+    expect(brief).toContain("2 papers");
+    expect(brief).toContain("risk-supporting");
+    expect(brief).toContain("APOE risk meta-analysis");
+  });
+
+  it("returns fallback for variant without findings", () => {
+    const brief = variantResearchBrief(makeVariant({ rsid: "rs1", gene: "BRCA2" }));
+    expect(brief).toContain("BRCA2 (rs1)");
+    expect(brief).toContain("No recent research");
+  });
+
+  it("notes PMC full text availability", () => {
+    const variant = makeVariant({
+      recentFindings: [{
+        title: "Open Paper", source: "PLoS", url: "", date: "2025", summary: "",
+        evidenceDirection: "protective", pmcUrl: "https://pmc.example.com/123",
+      }],
+    });
+    const brief = variantResearchBrief(variant);
+    expect(brief).toContain("full text available");
+    expect(brief).toContain("protective");
   });
 });
 

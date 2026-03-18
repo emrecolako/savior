@@ -49,6 +49,7 @@ export {
   classifyEvidenceDirection,
   annotateEvidenceDirection,
   searchClinicalTrials,
+  variantResearchBrief,
   saveResearchFindings,
   loadResearchFindings,
   RateLimiter,

@@ -627,6 +627,38 @@ export function generateResearchSummary(variants: MatchedVariant[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Generate an evidence-weighted research brief for a specific variant.
+ * Combines relevance scoring with evidence direction for a one-liner summary.
+ */
+export function variantResearchBrief(variant: MatchedVariant): string {
+  if (!variant.recentFindings || variant.recentFindings.length === 0) {
+    return `${variant.gene} (${variant.rsid}): No recent research available.`;
+  }
+
+  const findings = variant.recentFindings;
+  const dirCounts = { "supports-risk": 0, protective: 0, neutral: 0, uncertain: 0 };
+  for (const f of findings) {
+    if (f.evidenceDirection) dirCounts[f.evidenceDirection]++;
+  }
+
+  const dominant = (Object.entries(dirCounts) as [string, number][])
+    .filter(([, c]) => c > 0)
+    .sort(([, a], [, b]) => b - a)[0];
+
+  const dirLabel = dominant
+    ? dominant[0] === "supports-risk" ? "risk-supporting"
+    : dominant[0] === "protective" ? "protective"
+    : dominant[0] === "neutral" ? "neutral"
+    : "mixed"
+    : "unclassified";
+
+  const topPaper = findings[0];
+  const pmcNote = topPaper.pmcUrl ? " (full text available)" : "";
+
+  return `${variant.gene} (${variant.rsid}): ${findings.length} paper${findings.length !== 1 ? "s" : ""}, predominantly ${dirLabel}. Top: "${topPaper.title}" — ${topPaper.source}, ${topPaper.date}${pmcNote}.`;
+}
+
 // ─── Clinical trials search ─────────────────────────────────────
 
 export interface ClinicalTrial {
