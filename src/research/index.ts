@@ -378,6 +378,53 @@ export function scoreRelevance(finding: ResearchFinding, variant: MatchedVariant
   return score;
 }
 
+// ─── Research summary generator ─────────────────────────────────
+
+/**
+ * Generate a concise research summary from all findings across variants.
+ * Groups by gene/condition and highlights the most relevant papers.
+ */
+export function generateResearchSummary(variants: MatchedVariant[]): string {
+  const variantsWithFindings = variants.filter(
+    (v) => v.recentFindings && v.recentFindings.length > 0
+  );
+
+  if (variantsWithFindings.length === 0) {
+    return "No recent research findings were retrieved for the analysed variants.";
+  }
+
+  const lines: string[] = [];
+  const totalPapers = variantsWithFindings.reduce(
+    (sum, v) => sum + (v.recentFindings?.length ?? 0), 0
+  );
+
+  lines.push(
+    `Research enrichment identified ${totalPapers} relevant paper${totalPapers !== 1 ? "s" : ""} ` +
+    `across ${variantsWithFindings.length} variant${variantsWithFindings.length !== 1 ? "s" : ""}.`
+  );
+
+  // Group findings by gene for cohesive reporting
+  const geneFindings = new Map<string, { variants: MatchedVariant[]; findings: ResearchFinding[] }>();
+  for (const v of variantsWithFindings) {
+    const group = geneFindings.get(v.gene) ?? { variants: [], findings: [] };
+    group.variants.push(v);
+    group.findings.push(...(v.recentFindings ?? []));
+    geneFindings.set(v.gene, group);
+  }
+
+  for (const [gene, { variants: geneVariants, findings }] of geneFindings) {
+    const rsids = [...new Set(geneVariants.map((v) => v.rsid))].join(", ");
+    const topFinding = findings[0]; // Already sorted by relevance
+    if (topFinding) {
+      lines.push(
+        `**${gene}** (${rsids}): "${topFinding.title}" (${topFinding.source}, ${topFinding.date}).`
+      );
+    }
+  }
+
+  return lines.join("\n");
+}
+
 // ─── Provider registry ──────────────────────────────────────────
 
 const PROVIDERS: Record<string, new (...args: any[]) => ResearchProviderImpl> = {

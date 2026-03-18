@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { PubMedProvider, ExaProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml } from "../src/research/index.js";
+import { PubMedProvider, ExaProvider, enrichWithResearch, setSleep, resetSleep, scoreRelevance, extractAbstractFromXml, generateResearchSummary } from "../src/research/index.js";
 import { generateMarkdown } from "../src/reports/markdown.js";
 import type { MatchedVariant, AnalysisResult, ResearchConfig } from "../src/types.js";
 
@@ -413,6 +413,51 @@ describe("Research relevance scoring", () => {
       variant
     );
     expect(recent).toBeGreaterThan(older);
+  });
+});
+
+describe("Research summary generation", () => {
+  it("generates summary from variants with findings", () => {
+    const variants = [
+      makeVariant({
+        rsid: "rs1", gene: "APOE",
+        recentFindings: [
+          { title: "APOE Paper", source: "Nature", url: "", date: "2025", summary: "" },
+        ],
+      }),
+      makeVariant({
+        rsid: "rs2", gene: "BRCA2",
+        recentFindings: [
+          { title: "BRCA2 Paper", source: "Science", url: "", date: "2025", summary: "" },
+        ],
+      }),
+    ];
+    const summary = generateResearchSummary(variants);
+    expect(summary).toContain("2 relevant papers");
+    expect(summary).toContain("2 variants");
+    expect(summary).toContain("APOE");
+    expect(summary).toContain("BRCA2");
+  });
+
+  it("returns fallback message when no findings", () => {
+    const summary = generateResearchSummary([makeVariant()]);
+    expect(summary).toContain("No recent research findings");
+  });
+
+  it("groups multiple variants in same gene", () => {
+    const variants = [
+      makeVariant({
+        rsid: "rs1", gene: "APOE",
+        recentFindings: [{ title: "Paper 1", source: "J1", url: "", date: "2025", summary: "" }],
+      }),
+      makeVariant({
+        rsid: "rs2", gene: "APOE",
+        recentFindings: [{ title: "Paper 2", source: "J2", url: "", date: "2025", summary: "" }],
+      }),
+    ];
+    const summary = generateResearchSummary(variants);
+    expect(summary).toContain("rs1, rs2");
+    expect(summary).toContain("APOE");
   });
 });
 
