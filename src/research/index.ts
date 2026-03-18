@@ -210,34 +210,44 @@ export async function enrichWithResearch(
 
   console.log(`Researching ${toResearch.length} high-priority variants via ${config.provider}...`);
 
-  // Deduplicate by gene to avoid redundant searches for variants in the same gene
-  const researchedGenes = new Set<string>();
+  // Group by gene to avoid redundant searches
+  const geneGroups = new Map<string, MatchedVariant[]>();
+  for (const v of toResearch) {
+    const group = geneGroups.get(v.gene) ?? [];
+    group.push(v);
+    geneGroups.set(v.gene, group);
+  }
 
-  for (const variant of toResearch) {
-    // Skip if we've already researched a variant in the same gene
-    // (findings for the same gene are usually highly overlapping)
-    if (researchedGenes.has(variant.gene)) {
-      // Copy findings from the first variant in this gene
-      const donor = toResearch.find(
-        (v) => v.gene === variant.gene && v.recentFindings && v.recentFindings.length > 0
-      );
-      if (donor) {
-        variant.recentFindings = [...donor.recentFindings!];
+  // Research one representative per gene, then share findings
+  const uniqueGeneVariants = [...geneGroups.entries()].map(([, group]) => group[0]);
+
+  // Process with controlled concurrency (respect NCBI rate limits)
+  const concurrency = config.apiKey ? 3 : 1; // With API key: 10 req/s, without: 3 req/s
+  for (let i = 0; i < uniqueGeneVariants.length; i += concurrency) {
+    const batch = uniqueGeneVariants.slice(i, i + concurrency);
+    const results = await Promise.allSettled(
+      batch.map((variant) =>
+        provider.search(variant, config.maxResultsPerVariant, config.minYear)
+      )
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      const result = results[j];
+      const variant = batch[j];
+      if (result.status === "fulfilled") {
+        variant.recentFindings = result.value;
+      } else {
+        console.warn(`Failed to research ${variant.rsid}: ${result.reason?.message ?? "Unknown error"}`);
+        variant.recentFindings = [];
       }
-      continue;
-    }
 
-    try {
-      variant.recentFindings = await provider.search(
-        variant,
-        config.maxResultsPerVariant,
-        config.minYear
-      );
-      researchedGenes.add(variant.gene);
-    } catch (err: any) {
-      console.warn(`Failed to research ${variant.rsid}: ${err.message}`);
-      variant.recentFindings = [];
-      researchedGenes.add(variant.gene);
+      // Share findings with other variants in the same gene
+      const sameGene = geneGroups.get(variant.gene) ?? [];
+      for (const sibling of sameGene) {
+        if (sibling !== variant) {
+          sibling.recentFindings = [...(variant.recentFindings ?? [])];
+        }
+      }
     }
   }
 
