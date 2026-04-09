@@ -1,0 +1,1586 @@
+{
+  "version": "0.1.0",
+  "lastUpdated": "2026-04-09",
+  "entries": [
+    {
+      "rsid": "rs2007044",
+      "gene": "HIST1H2BJ",
+      "riskAllele": "G",
+      "condition": "Schizophrenia",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.127 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "MHC region locus — strongest schizophrenia GWAS signal, implicating immune/synaptic pruning via complement C4.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4766428",
+      "gene": "CACNA1C",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — voltage-gated calcium channel",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.115 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "CACNA1C encodes the alpha-1C subunit of L-type calcium channels critical for neuronal excitability. Shared risk locus with bipolar disorder.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs13194053",
+      "gene": "RIMS1",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — synaptic vesicle release",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.100 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "RIMS1 regulates neurotransmitter release at synapses. Implicates presynaptic dysfunction in schizophrenia.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4523957",
+      "gene": "GRIN2A",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — NMDA receptor subunit",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.090 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "GRIN2A encodes an NMDA receptor subunit central to the glutamate hypothesis of schizophrenia. Target for novel therapeutics.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs11191419",
+      "gene": "AS3MT",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — arsenic methyltransferase locus",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.085 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "10q24.32 locus near AS3MT. One of the most replicated schizophrenia GWAS loci across populations.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2514218",
+      "gene": "DRD2",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — dopamine D2 receptor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.080 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "DRD2 is the primary target of all approved antipsychotics. This GWAS hit validates the dopamine hypothesis and confirms pharmacological relevance.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs6704641",
+      "gene": "ZNF804A",
+      "riskAllele": "G",
+      "condition": "Schizophrenia — zinc finger protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.075 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "ZNF804A affects brain connectivity and white matter integrity. One of the earliest genome-wide significant schizophrenia loci.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs75059851",
+      "gene": "SDCCAG8",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — centrosomal protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.071 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "SDCCAG8 localises to centrosomes and is involved in neuronal migration during brain development.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs11682175",
+      "gene": "VRK2",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — vaccinia-related kinase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.067 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "VRK2 regulates neuronal proliferation and apoptosis. Expression is reduced in schizophrenia post-mortem brains.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2905426",
+      "gene": "ZSWIM6",
+      "riskAllele": "C",
+      "condition": "Schizophrenia — neurodevelopmental",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.064 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "ZSWIM6 is highly expressed in the developing brain and implicated in neurodevelopmental processes.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs6065094",
+      "gene": "CEBPB",
+      "riskAllele": "A",
+      "condition": "Schizophrenia — transcription factor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.061 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "CEBPB is a transcription factor involved in inflammatory response and neurogenesis.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs3849046",
+      "gene": "NEGR1",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — neuronal growth regulator",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.057 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "NEGR1 promotes neurite outgrowth and is shared with depression GWAS. Pleiotropic psychiatric locus.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12325245",
+      "gene": "NRXN3",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — neurexin 3",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.054 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "NRXN3 is a presynaptic cell adhesion molecule essential for synapse formation. Neurexin family implicated across psychiatric disorders.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs9607782",
+      "gene": "COMT",
+      "riskAllele": "A",
+      "condition": "Schizophrenia — catechol-O-methyltransferase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.052 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "COMT degrades prefrontal dopamine. Val158Met (rs4680) modulates cognitive function and psychosis risk.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs11191580",
+      "gene": "NT5C2",
+      "riskAllele": "C",
+      "condition": "Schizophrenia — purine metabolism",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.049 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "NT5C2 involved in purine metabolism at the 10q24.32 locus, one of the most robust schizophrenia-associated regions.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2053079",
+      "gene": "ITIH3",
+      "riskAllele": "G",
+      "condition": "Schizophrenia — inter-alpha-trypsin inhibitor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.047 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "ITIH3/ITIH4 locus at 3p21.1 involved in extracellular matrix stability and inflammatory response in the brain.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4648845",
+      "gene": "DPYD",
+      "riskAllele": "T",
+      "condition": "Schizophrenia — dihydropyrimidine dehydrogenase locus",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.044 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "Locus near DPYD at 1p21.3. The associated region influences cortical gene expression patterns.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs6434928",
+      "gene": "SATB2",
+      "riskAllele": "C",
+      "condition": "Schizophrenia — chromatin organiser (protective)",
+      "category": "psychiatric",
+      "severity": "protective",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "0.960 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "SATB2 is a chromatin-remodelling factor crucial for cortical neuron identity. Protective allele associated with reduced risk.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1518395",
+      "gene": "EPC2",
+      "riskAllele": "A",
+      "condition": "Schizophrenia — enhancer of polycomb",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.040 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "EPC2 is involved in chromatin modification and transcriptional regulation in neurons.",
+      "tags": [
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7085104",
+      "gene": "CACNB2",
+      "riskAllele": "G",
+      "condition": "Schizophrenia — calcium channel beta subunit",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.038 per allele",
+      "sources": [
+        "PMID:35396580"
+      ],
+      "notes": "CACNB2 modulates voltage-gated calcium channel activity. Cross-disorder locus shared with bipolar and MDD.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "schizophrenia"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs10994397",
+      "gene": "ANK3",
+      "riskAllele": "C",
+      "condition": "Bipolar Disorder — ankyrin-G",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.104 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "ANK3 encodes ankyrin-G, essential for axon initial segment formation and neuronal polarity. Key bipolar susceptibility gene.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs9834970",
+      "gene": "ITIH3",
+      "riskAllele": "C",
+      "condition": "Bipolar Disorder — inter-alpha-trypsin inhibitor",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.096 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "ITIH3 at 3p21.1 — shared locus with schizophrenia, implicating neuroinflammatory processes in both disorders.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12576775",
+      "gene": "ODZ4",
+      "riskAllele": "G",
+      "condition": "Bipolar Disorder — teneurin transmembrane protein",
+      "category": "psychiatric",
+      "severity": "moderate",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.088 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "ODZ4 (TENM4) guides axonal pathfinding and is critical for brain connectivity. Bipolar-specific GWAS locus.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs174576",
+      "gene": "FADS2",
+      "riskAllele": "A",
+      "condition": "Bipolar Disorder — fatty acid desaturase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.081 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "FADS2 controls omega-3/6 fatty acid synthesis critical for neuronal membrane fluidity and inflammatory signalling.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7296288",
+      "gene": "NDUFA4",
+      "riskAllele": "T",
+      "condition": "Bipolar Disorder — mitochondrial complex I",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.075 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "NDUFA4 is a mitochondrial respiratory chain component. Supports mitochondrial dysfunction hypothesis in bipolar disorder.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1487441",
+      "gene": "MIR2113",
+      "riskAllele": "G",
+      "condition": "Bipolar Disorder — microRNA locus",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.070 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "MIR2113 locus at 6q16.1 regulates gene expression in developing brain. Implicated in circadian rhythm disruption.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2727943",
+      "gene": "TRANK1",
+      "riskAllele": "A",
+      "condition": "Bipolar Disorder — tetratricopeptide repeat domain",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.065 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "TRANK1 expression is modulated by lithium and valproate, directly linking this locus to bipolar pharmacotherapy.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2235353",
+      "gene": "TRIM26",
+      "riskAllele": "T",
+      "condition": "Bipolar Disorder — MHC region",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.062 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "MHC region locus shared with schizophrenia. Immune pathway involvement in bipolar pathogenesis.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12913832",
+      "gene": "HERC2",
+      "riskAllele": "G",
+      "condition": "Bipolar Disorder — HERC2/OCA2 locus",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.058 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "HERC2 region harbours variants associated with circadian chronotype and bipolar disorder, possibly via sleep-wake cycle disruption.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs884080",
+      "gene": "STARD3",
+      "riskAllele": "C",
+      "condition": "Bipolar Disorder — lipid transport",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.054 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "STARD3 mediates cholesterol transport, relevant to neurosteroid synthesis and membrane lipid composition in neurons.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1006737",
+      "gene": "CACNA1C",
+      "riskAllele": "A",
+      "condition": "Bipolar Disorder — calcium channel (secondary signal)",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.048 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "Independent signal at CACNA1C, confirming the importance of this gene as the premier bipolar risk locus.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2297909",
+      "gene": "KDM3B",
+      "riskAllele": "T",
+      "condition": "Bipolar Disorder — histone demethylase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.045 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "KDM3B is a histone demethylase involved in epigenetic regulation of gene expression during neurodevelopment.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12575685",
+      "gene": "DCDC5",
+      "riskAllele": "G",
+      "condition": "Bipolar Disorder — doublecortin domain",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.043 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "DCDC5 contains doublecortin domains implicated in neuronal migration and cortical layering.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs8042374",
+      "gene": "AKAP13",
+      "riskAllele": "A",
+      "condition": "Bipolar Disorder — A-kinase anchoring protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.040 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "AKAP13 scaffolds PKA signalling, relevant to cAMP-dependent pathways targeted by lithium.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7544145",
+      "gene": "MCL1",
+      "riskAllele": "C",
+      "condition": "Bipolar Disorder — apoptosis regulator (protective)",
+      "category": "psychiatric",
+      "severity": "protective",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "0.963 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "MCL1 is an anti-apoptotic factor. Protective allele may enhance neuronal survival under stress.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs3732386",
+      "gene": "MAU2",
+      "riskAllele": "T",
+      "condition": "Bipolar Disorder — cohesin loading factor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.036 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "MAU2 is involved in chromatid cohesion and gene regulation. Linked to neurodevelopmental processes.",
+      "tags": [
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2517959",
+      "gene": "HLA-B",
+      "riskAllele": "C",
+      "condition": "Bipolar Disorder — MHC class I",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.034 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "HLA-B region variant supports immune system involvement in bipolar disorder aetiology.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs59979824",
+      "gene": "GRIN2A",
+      "riskAllele": "T",
+      "condition": "Bipolar Disorder — NMDA receptor (secondary)",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.032 per allele",
+      "sources": [
+        "PMID:34002096"
+      ],
+      "notes": "GRIN2A NMDA receptor variant shared with schizophrenia. Glutamatergic dysfunction is a cross-diagnostic theme.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "bipolar"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs10514299",
+      "gene": "TMEM161B",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — transmembrane protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.048 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "TMEM161B-MEF2C locus. MEF2C is a transcription factor critical for neuronal differentiation and synaptic plasticity.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1432639",
+      "gene": "SLIT3",
+      "riskAllele": "G",
+      "condition": "Major Depressive Disorder — axon guidance",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.046 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "SLIT3 guides axonal pathfinding in the developing brain, connecting depression to neurodevelopmental circuitry.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7117514",
+      "gene": "GRM5",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — metabotropic glutamate receptor 5",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.043 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "GRM5 modulates glutamatergic neurotransmission. mGluR5 antagonists are under investigation as rapid-acting antidepressants.",
+      "tags": [
+        "pathway:glutamate",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1354115",
+      "gene": "LHFPL3",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — lipoma HMGIC fusion partner",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.041 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "LHFPL3 is expressed in the brain and modulates GABAergic signalling at inhibitory synapses.",
+      "tags": [
+        "pathway:gaba",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2422321",
+      "gene": "ESRRB",
+      "riskAllele": "C",
+      "condition": "Major Depressive Disorder — estrogen-related receptor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.039 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "ESRRB is an orphan nuclear receptor involved in energy metabolism and mitochondrial function in neurons.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2568958",
+      "gene": "NEGR1",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — neuronal growth (secondary)",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.037 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "Second independent signal at NEGR1 locus, reinforcing its role as a key MDD susceptibility gene.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12552",
+      "gene": "RERE",
+      "riskAllele": "G",
+      "condition": "Major Depressive Disorder — transcriptional regulator",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.035 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "RERE is a chromatin-binding transcriptional regulator essential for brain development. Rare RERE mutations cause neurodevelopmental disorders.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs301806",
+      "gene": "OLFM3",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — olfactomedin",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.033 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "OLFM3 is expressed in the brain and may regulate synapse formation and neuronal connectivity.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs10149470",
+      "gene": "LRFN5",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — leucine-rich repeat",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.031 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "LRFN5 organises excitatory synapses. Part of the synaptic cell adhesion molecule family implicated in psychiatric disorders.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2723987",
+      "gene": "HIST1H1B",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — histone cluster",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.029 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "MHC region variant near histone genes. May reflect neuroimmune contribution to depression.",
+      "tags": [
+        "pathway:neuroinflammation",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs11209948",
+      "gene": "PKN2",
+      "riskAllele": "C",
+      "condition": "Major Depressive Disorder — protein kinase N2",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.028 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "PKN2 is a serine/threonine kinase involved in cytoskeletal organisation and neuronal morphology.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1475120",
+      "gene": "ZEB2",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — zinc finger E-box binding",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.026 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "ZEB2 is a transcription factor critical for neural crest cell migration and cortical interneuron development.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4543289",
+      "gene": "TMEM106B",
+      "riskAllele": "G",
+      "condition": "Major Depressive Disorder — lysosomal regulation",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.025 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "TMEM106B regulates lysosomal function and is linked to frontotemporal dementia. Emerging role in mood regulation.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs8025231",
+      "gene": "IDH2",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — isocitrate dehydrogenase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.023 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "IDH2 is a mitochondrial enzyme. Supports metabolic and mitochondrial dysfunction hypotheses in depression.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7966915",
+      "gene": "NOS1",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — nitric oxide synthase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.022 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "NOS1 produces nitric oxide, a retrograde neurotransmitter modulating synaptic plasticity and stress responses.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2422322",
+      "gene": "DCC",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — netrin receptor (protective)",
+      "category": "psychiatric",
+      "severity": "protective",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "0.980 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "DCC is a netrin-1 receptor guiding axons in the mesolimbic dopamine pathway. Protective allele may enhance reward circuitry resilience.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4904738",
+      "gene": "GPHN",
+      "riskAllele": "C",
+      "condition": "Major Depressive Disorder — gephyrin",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.019 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "Gephyrin is the central organiser of inhibitory GABAergic and glycinergic postsynapses.",
+      "tags": [
+        "pathway:gaba",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7195683",
+      "gene": "RBFOX1",
+      "riskAllele": "A",
+      "condition": "Major Depressive Disorder — RNA binding fox-1",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.018 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "RBFOX1 regulates alternative splicing of neuronal mRNAs. Implicated across psychiatric and neurodevelopmental conditions.",
+      "tags": [
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1950829",
+      "gene": "LSAMP",
+      "riskAllele": "T",
+      "condition": "Major Depressive Disorder — limbic system-associated membrane protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.017 per allele",
+      "sources": [
+        "PMID:30718901"
+      ],
+      "notes": "LSAMP modulates limbic system neuronal connectivity. Reduced expression observed in animal models of depression.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "mdd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4916723",
+      "gene": "LINC00461",
+      "riskAllele": "A",
+      "condition": "ADHD — intergenic lincRNA near MEF2C",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.067 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "Near MEF2C, a transcription factor controlling neuronal differentiation. Top ADHD locus, shared with MDD and educational attainment.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs28411770",
+      "gene": "FOXP2",
+      "riskAllele": "T",
+      "condition": "ADHD — forkhead box P2",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.062 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "FOXP2 is the 'language gene' — regulates speech, language, and motor skill circuits. ADHD locus highlights neurodevelopmental overlap.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1222063",
+      "gene": "DUSP6",
+      "riskAllele": "A",
+      "condition": "ADHD — dual-specificity phosphatase 6",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.057 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "DUSP6 regulates dopaminergic signalling via ERK pathway. Directly relevant to stimulant medication response in ADHD.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs212178",
+      "gene": "SEMA6D",
+      "riskAllele": "A",
+      "condition": "ADHD — semaphorin 6D",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.054 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "SEMA6D guides axonal pathfinding and neural circuit formation during brain development.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs3768046",
+      "gene": "ST3GAL3",
+      "riskAllele": "A",
+      "condition": "ADHD — sialyltransferase",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.050 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "ST3GAL3 modifies glycoproteins important for synaptic function. Mutations cause intellectual disability.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4858241",
+      "gene": "MITF",
+      "riskAllele": "T",
+      "condition": "ADHD — microphthalmia-associated transcription factor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.047 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "MITF regulates melanocyte and mast cell development. Unexpected ADHD locus suggesting novel biological pathways.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs11420276",
+      "gene": "ARNTL",
+      "riskAllele": "T",
+      "condition": "ADHD — circadian clock gene (BMAL1)",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.044 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "ARNTL (BMAL1) is the core circadian clock transcription factor. Links ADHD to circadian rhythm disruption and sleep disturbances.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs8039398",
+      "gene": "SEMA6D",
+      "riskAllele": "C",
+      "condition": "ADHD — semaphorin (secondary signal)",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.041 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "Second semaphorin family signal, reinforcing axon guidance as a central ADHD biological theme.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs6452884",
+      "gene": "SORCS2",
+      "riskAllele": "A",
+      "condition": "ADHD — sortilin-related receptor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.039 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "SORCS2 modulates BDNF signalling and dopamine receptor trafficking. Relevant to both ADHD and substance use.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs12601675",
+      "gene": "WNT3",
+      "riskAllele": "C",
+      "condition": "ADHD — Wnt signalling",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.036 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "WNT3 at 17q21.31 — Wnt signalling regulates neurodevelopment. This inversion region is associated with multiple brain-related traits.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs1427829",
+      "gene": "PCDH7",
+      "riskAllele": "G",
+      "condition": "ADHD — protocadherin 7",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.034 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "PCDH7 is a cell adhesion molecule important for establishing neuronal connectivity during development.",
+      "tags": [
+        "pathway:synaptic-plasticity",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2944542",
+      "gene": "MFAP3",
+      "riskAllele": "T",
+      "condition": "ADHD — microfibril-associated protein",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.032 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "MFAP3 locus also harbours NRG2 nearby — neuregulin signalling is implicated in dopaminergic neurotransmission.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs17531412",
+      "gene": "SORCS1",
+      "riskAllele": "A",
+      "condition": "ADHD — sortilin-related VPS10 domain",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.029 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "SORCS1, like SORCS2, is involved in intracellular protein sorting and BDNF/neurotrophin receptor trafficking.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs113551872",
+      "gene": "KLF7",
+      "riskAllele": "T",
+      "condition": "ADHD — Kruppel-like factor 7",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.027 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "KLF7 is a transcription factor essential for axon outgrowth and neuronal development.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs2906457",
+      "gene": "PINX1",
+      "riskAllele": "C",
+      "condition": "ADHD — telomere regulation",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.025 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "PINX1 regulates telomerase. Telomere biology is emerging as relevant to stress-related psychiatric conditions.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs7821914",
+      "gene": "XKR4",
+      "riskAllele": "G",
+      "condition": "ADHD — XK-related protein (protective)",
+      "category": "psychiatric",
+      "severity": "protective",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "0.977 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "XKR4 is expressed in the hypothalamus and implicated in feeding behaviour. Protective allele for ADHD.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs3923844",
+      "gene": "MIR2113",
+      "riskAllele": "A",
+      "condition": "ADHD — microRNA regulatory",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.022 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "MIR2113 locus shared with bipolar disorder. MicroRNA-mediated gene regulation in mood and attention circuits.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs56017752",
+      "gene": "MRAS",
+      "riskAllele": "T",
+      "condition": "ADHD — muscle RAS oncogene homolog",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.020 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "MRAS is involved in RAS-MAPK signalling. This pathway regulates neuronal growth and synaptic plasticity.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs10262192",
+      "gene": "ICA1",
+      "riskAllele": "C",
+      "condition": "ADHD — islet cell autoantigen 1",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.018 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "ICA1 regulates dense-core vesicle trafficking in neurons and neuroendocrine cells.",
+      "tags": [
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    },
+    {
+      "rsid": "rs4282339",
+      "gene": "DRD2",
+      "riskAllele": "G",
+      "condition": "ADHD — dopamine D2 receptor",
+      "category": "psychiatric",
+      "severity": "low",
+      "evidenceLevel": "GWAS meta-analysis (PGC)",
+      "oddsRatio": "1.017 per allele",
+      "sources": [
+        "PMID:36702997"
+      ],
+      "notes": "DRD2 is the target of stimulant medications used in ADHD. Shared locus with schizophrenia confirms dopaminergic basis of ADHD.",
+      "tags": [
+        "pathway:catecholamine",
+        "pgc-gwas",
+        "adhd"
+      ],
+      "population": "EUR",
+      "lastUpdated": "2026-04-09"
+    }
+  ]
+}
