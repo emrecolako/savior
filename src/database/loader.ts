@@ -9,6 +9,11 @@ const __dirname = dirname(__filename);
 /** Default database path (shipped with the package) */
 const DEFAULT_DB_PATH = join(__dirname, "../../data/snp-database.json");
 
+/** Bundled supplementary databases auto-loaded when present */
+const BUNDLED_SUPPLEMENTARY = [
+  join(__dirname, "../../data/psychiatric-gwas.json"),
+];
+
 /**
  * Load and optionally merge SNP databases.
  *
@@ -30,7 +35,17 @@ export function loadDatabase(customPath?: string, supplementary?: string[]): Snp
     allEntries.set(entry.rsid, entry);
   }
 
-  // Merge supplementary databases (later entries override earlier ones)
+  // Auto-load bundled supplementary databases (e.g. psychiatric GWAS)
+  for (const bundledPath of BUNDLED_SUPPLEMENTARY) {
+    if (existsSync(bundledPath)) {
+      const extra: SnpDatabase = JSON.parse(readFileSync(bundledPath, "utf-8"));
+      for (const entry of extra.entries) {
+        allEntries.set(entry.rsid, entry);
+      }
+    }
+  }
+
+  // Merge user-specified supplementary databases (later entries override earlier ones)
   if (supplementary) {
     for (const path of supplementary) {
       if (!existsSync(path)) {

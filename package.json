@@ -20,6 +20,7 @@
     "format": "prettier --write 'src/**/*.ts'",
     "db:stats": "tsx scripts/db-stats.ts",
     "db:validate": "tsx scripts/validate-db.ts",
+    "db:fetch-pgc": "tsx scripts/fetch-pgc-gwas.ts",
     "dashboard:dev": "cd dashboard && npm run dev",
     "dashboard:build": "cd dashboard && npm run build",
     "dashboard:preview": "cd dashboard && npm run preview"

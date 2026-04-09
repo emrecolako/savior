@@ -19,6 +19,30 @@
       "traitName": "Autoimmune Risk (Composite)",
       "fileName": "autoimmune.pgs.json",
       "pgsId": "PGS000071"
+    },
+    {
+      "traitId": "schizophrenia",
+      "traitName": "Schizophrenia",
+      "fileName": "schizophrenia.pgs.json",
+      "pgsId": "PGC-SCZ3"
+    },
+    {
+      "traitId": "bipolar",
+      "traitName": "Bipolar Disorder",
+      "fileName": "bipolar.pgs.json",
+      "pgsId": "PGC-BIP3"
+    },
+    {
+      "traitId": "mdd",
+      "traitName": "Major Depressive Disorder",
+      "fileName": "mdd.pgs.json",
+      "pgsId": "PGC-MDD"
+    },
+    {
+      "traitId": "adhd",
+      "traitName": "ADHD",
+      "fileName": "adhd.pgs.json",
+      "pgsId": "PGC-ADHD"
     }
   ]
 }
